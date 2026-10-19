@@ -590,3 +590,62 @@ yok**, dolayısıyla son haftada toplu bekleme de yok.
 | Cevabı bilinmeyen tasarım sorusu | `DECISIONS.md`'ye varsayımını yaz, devam et, Cuma karara bağla |
 | Çakışma çıktı | Muhtemelen ortak dosyadasın (§4) — sahibine danış |
 | İşim bitti, boşum | `BACKLOG.md`'den tek iş çek (WIP = 1) |
+| Hazır gelen kodu kim yazdı, ne yapacağım? | §17 |
+
+---
+
+## 17. Hazır gelen kod — iskeletin kapsamı
+
+İlk commit boş bir iskelet değil: her üç alanda da çalışır kod var. Bu bilinçli bir
+karar (hız), ama iki sonucu var ve ikisi de yönetilmeli.
+
+### Ne hazır, ne değil
+
+| | Çalışır durumda | İskelet (`NotImplementedError` / TODO) |
+|---|---|---|
+| **Esra** `web/` | `socket.ts` (üstel geri çekilmeli reconnect), `client.ts`, `types/api.ts`, `LiveBadge`, `Dashboard` | FloorPlan, SessionLog, Tariffs, Reports, layout/tasarım sistemi |
+| **Berat** `gateway/` | WS `manager`/`server`/`bridge`, ANPR `plate_gen`/`simulator`/`scenarios`, `core_client`, `mock_gateway` | `api/sessions.py`, `flow/session_flow.py` |
+| **Damla** `core/` | `pricing.py` + 23 test, `occupancy.py`, `publisher.py`, modeller, `mock_core` | `api/lots.py`, `api/tariffs.py`, migration'lar |
+
+Gün 0'ın tamamı ve 1. haftanın bir kısmı yazılmış durumda.
+
+### Revize gün tablosu
+
+| | Esra | Berat | Damla |
+|---|--:|--:|--:|
+| Çekirdek (ilk plan) | 15.3 | 15.8 | 15.3 |
+| Hazır gelen | −2.5 | −4.5 | −4.0 |
+| **Devralma payı** (okuma + anlama) | +1.0 | +1.0 | — |
+| Kalan çekirdek | **13.8** | **12.3** | **11.3** |
+| Havuz payı (11 ÷ 3) | +3.7 | +3.7 | +3.7 |
+| **Toplam** | **17.5** | **16.0** | **15.0** |
+
+Denge korunuyor (2.5 gün aralık, tahmin hata payının içinde) ve toplam ~11 gün kısaldı —
+4 haftalık plan rahatlıkla 3 haftaya sığar. Sapma olursa ayar kolu yine havuz (§11).
+
+### Devralınan kodun sahipliği — Gün 0'a eklenen adım
+
+Yazmadığın kodun sahibi olmazsın; bozulduğunda tamir edemezsin. Bunu çözen tek bir
+ritüel var ve Gün 0'da yapılır:
+
+> **Kod okuma turu (45 dk).** Herkes KENDİ alanındaki hazır kodu okur ve diğer ikisine
+> 10 dakikada anlatır: bu dosya ne yapıyor, neden böyle yazılmış, nerede kırılır.
+> Anlatamadığın satır senin değildir — ya anla ya sil ve yeniden yaz.
+
+Özellikle anlatılması gereken üç yer:
+
+| Dosya | Anlatılacak soru |
+|---|---|
+| `web/src/api/socket.ts` | Bağlantı koptuğunda ne oluyor? Neden yeniden bağlanınca REST'ten tam durum çekiliyor? |
+| `gateway/ws/manager.py` | Bir istemci kopunca yayın neden durmuyor? `broadcast` içindeki `try` niye var? |
+| `gateway/ws/bridge.py` | Redis giderse köprü neden ölmüyor? 3 saniye nereden geldi? |
+
+### Bilinen eksik: doğrulanmamış kısımlar
+
+- `web/` hiç çalıştırılmadı (`npm install` yapılmadı). Kod tip olarak tutarlı, ama
+  `npm run dev` denenmedi.
+- Mock sunucular ayağa kaldırılmadı (`fastapi`/`uvicorn` kurulu değildi). Dosyalar
+  yazıldı, import edilip koşturulmadı.
+- Makinede `python3-venv` yok: `sudo apt install python3-venv` gerekiyor.
+
+Gün 0'ın ilk işi bu üçünü kapatmak olsun.
