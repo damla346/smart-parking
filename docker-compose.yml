@@ -1,0 +1,36 @@
+# Sahip: Damla (YOL_HARITASI.md §4)
+# Geliştirme ortamı: SADECE altyapı. Uygulama kodu natif çalışır (hot-reload için).
+# Servislerin paketlenmesi son haftada docker-compose.prod.yml ile yapılır — sahibi Berat.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sp_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-parking}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-parking}
+      POSTGRES_DB: ${POSTGRES_DB:-parking}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-parking}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: sp_redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

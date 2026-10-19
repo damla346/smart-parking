@@ -1,0 +1,13 @@
+{
+  "lot_id": 1,
+  "total": 120,
+  "occupied": 83,
+  "free": 37,
+  "occupancy_rate": 0.69,
+  "by_floor": [
+    { "floor_id": 1, "level": 1, "total": 40, "occupied": 31, "free": 9 },
+    { "floor_id": 2, "level": 2, "total": 40, "occupied": 29, "free": 11 },
+    { "floor_id": 3, "level": 3, "total": 40, "occupied": 23, "free": 17 }
+  ],
+  "at": "2026-10-19T16:05:44Z"
+}

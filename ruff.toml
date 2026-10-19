@@ -1,0 +1,22 @@
+# Ortak lint ayarı. Gürültü yapmasın diye dar tutuldu (YOL_HARITASI.md §9).
+line-length = 99
+target-version = "py310"
+
+[lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C90", "PERF"]
+ignore = [
+    "B008",   # FastAPI Depends() idiyomu
+]
+
+[lint.isort]
+# Üç paket de birinci taraf — yoksa import sırası her serviste farklı çıkar
+known-first-party = ["contracts", "core", "gateway"]
+
+[lint.mccabe]
+max-complexity = 15
+
+[lint.per-file-ignores]
+"infra/mocks/*" = ["S311"]  # mock'larda rastgelelik kriptografik olmak zorunda değil
+"**/tests/*" = ["S101"]
+# Dayanıklılık döngülerinde try/except zorunlu: kopan bağlantı yayını durdurmamalı
+"services/gateway/gateway/ws/*" = ["PERF203"]

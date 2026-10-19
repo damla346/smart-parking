@@ -1,0 +1,6 @@
+[
+  { "id": 1, "lot_id": 1, "from_min": 0, "to_min": 30, "price_per_min_cents": 0 },
+  { "id": 2, "lot_id": 1, "from_min": 30, "to_min": 120, "price_per_min_cents": 50 },
+  { "id": 3, "lot_id": 1, "from_min": 120, "to_min": 480, "price_per_min_cents": 35 },
+  { "id": 4, "lot_id": 1, "from_min": 480, "to_min": null, "price_per_min_cents": 20 }
+]

@@ -1,0 +1,227 @@
+# Sahip: Berat · APPEND-ONLY (YOL_HARITASI.md §7)
+# Bu dosya gateway'in dışa açtığı REST yüzeyinin TEK doğru kaynağıdır.
+# Esra buradan tip üretir, Berat buna uyar, mock'lar bunu döndürür.
+openapi: 3.0.3
+info:
+  title: Smart Parking Gateway API
+  version: 0.1.0
+
+servers:
+  - url: http://localhost:8000
+    description: gerçek gateway
+  - url: http://localhost:8100
+    description: mock_gateway (USE_MOCK=true)
+
+paths:
+  /health:
+    get:
+      summary: Sağlık kontrolü
+      responses:
+        "200":
+          description: OK
+
+  /lots:
+    get:
+      summary: Otopark listesi
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Lot" }
+
+  /lots/{lot_id}/occupancy:
+    get:
+      summary: Anlık doluluk özeti (WS yeniden bağlanınca tam durum için)
+      parameters:
+        - { name: lot_id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Occupancy" }
+
+  /lots/{lot_id}/floors:
+    get:
+      summary: Kat ve slot listesi (FloorPlan ekranı)
+      parameters:
+        - { name: lot_id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Floor" }
+
+  /entry:
+    post:
+      summary: Plaka okundu, araç giriyor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plate, lot_id]
+              properties:
+                plate: { type: string, example: "01ABC123" }
+                lot_id: { type: integer, example: 1 }
+      responses:
+        "201":
+          description: Oturum açıldı
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Session" }
+        "409":
+          description: Boş slot yok veya plaka zaten içeride
+
+  /exit:
+    post:
+      summary: Araç çıkıyor, ücret hesaplanır
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plate]
+              properties:
+                plate: { type: string, example: "01ABC123" }
+      responses:
+        "200":
+          description: Oturum kapandı
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FeeBreakdown" }
+        "404":
+          description: Açık oturum bulunamadı
+
+  /sessions:
+    get:
+      summary: Giriş-çıkış kayıtları (SessionLog ekranı)
+      parameters:
+        - { name: plate, in: query, schema: { type: string } }
+        - { name: lot_id, in: query, schema: { type: integer } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: limit, in: query, schema: { type: integer, default: 50 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Session" }
+
+  /tariffs:
+    get:
+      summary: Kademeli tarife kuralları
+      parameters:
+        - { name: lot_id, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TariffRule" }
+
+components:
+  schemas:
+    Lot:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        address: { type: string }
+        total_slots: { type: integer }
+
+    Floor:
+      type: object
+      properties:
+        id: { type: integer }
+        lot_id: { type: integer }
+        level: { type: integer }
+        slot_count: { type: integer }
+        slots:
+          type: array
+          items: { $ref: "#/components/schemas/Slot" }
+
+    Slot:
+      type: object
+      properties:
+        id: { type: integer }
+        floor_id: { type: integer }
+        code: { type: string, example: "K2-018" }
+        type: { type: string, enum: [standard, disabled, ev, large] }
+        status: { type: string, enum: [free, occupied, reserved] }
+        plate: { type: string, nullable: true }
+
+    Occupancy:
+      type: object
+      properties:
+        lot_id: { type: integer }
+        total: { type: integer }
+        occupied: { type: integer }
+        free: { type: integer }
+        occupancy_rate: { type: number, format: float }
+        by_floor:
+          type: array
+          items:
+            type: object
+            properties:
+              floor_id: { type: integer }
+              level: { type: integer }
+              total: { type: integer }
+              occupied: { type: integer }
+              free: { type: integer }
+        at: { type: string, format: date-time }
+
+    Session:
+      type: object
+      properties:
+        id: { type: integer }
+        plate: { type: string }
+        lot_id: { type: integer }
+        slot_id: { type: integer }
+        slot_code: { type: string }
+        entry_at: { type: string, format: date-time }
+        exit_at: { type: string, format: date-time, nullable: true }
+        duration_min: { type: integer, nullable: true }
+        fee_cents: { type: integer, nullable: true }
+        status: { type: string, enum: [open, closed] }
+
+    TariffRule:
+      type: object
+      properties:
+        id: { type: integer }
+        lot_id: { type: integer }
+        from_min: { type: integer }
+        to_min: { type: integer, nullable: true, description: "null = açık uçlu son kademe" }
+        price_per_min_cents: { type: integer }
+
+    FeeBreakdown:
+      type: object
+      description: Kademe kademe ücret dökümü — tarife motorunun çıktısı
+      properties:
+        session_id: { type: integer }
+        plate: { type: string }
+        duration_min: { type: integer }
+        total_cents: { type: integer }
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              from_min: { type: integer }
+              to_min: { type: integer, nullable: true }
+              minutes: { type: integer }
+              price_per_min_cents: { type: integer }
+              subtotal_cents: { type: integer }

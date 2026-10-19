@@ -1,0 +1,4 @@
+[
+  { "id": 1, "name": "Adana Merkez Otopark", "address": "Çukurova / Adana", "total_slots": 120 },
+  { "id": 2, "name": "Seyhan AVM Otopark", "address": "Seyhan / Adana", "total_slots": 80 }
+]

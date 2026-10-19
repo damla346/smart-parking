@@ -1,0 +1,31 @@
+[
+  {
+    "id": 1,
+    "lot_id": 1,
+    "level": 1,
+    "slot_count": 40,
+    "slots": [
+      { "id": 1, "floor_id": 1, "code": "K1-001", "type": "disabled", "status": "free", "plate": null },
+      { "id": 2, "floor_id": 1, "code": "K1-002", "type": "ev", "status": "occupied", "plate": "35GHI789" },
+      { "id": 7, "floor_id": 1, "code": "K1-007", "type": "standard", "status": "occupied", "plate": "34XYZ987" }
+    ]
+  },
+  {
+    "id": 2,
+    "lot_id": 1,
+    "level": 2,
+    "slot_count": 40,
+    "slots": [
+      { "id": 42, "floor_id": 2, "code": "K2-018", "type": "standard", "status": "free", "plate": null }
+    ]
+  },
+  {
+    "id": 3,
+    "lot_id": 1,
+    "level": 3,
+    "slot_count": 40,
+    "slots": [
+      { "id": 95, "floor_id": 3, "code": "K3-015", "type": "large", "status": "occupied", "plate": "06DEF456" }
+    ]
+  }
+]

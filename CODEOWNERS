@@ -1,0 +1,26 @@
+# Sahiplik sınırlarını insan disiplini değil makine korur (YOL_HARITASI.md §8).
+# GitHub kullanıcı adlarını gerçek hesaplarla değiştirin.
+
+# --- Esra · Frontend ---
+/web/                       @esra
+/contracts/fixtures/        @esra
+
+# --- Berat · İletişim ---
+/services/gateway/          @berat
+/contracts/openapi.yaml     @berat
+/contracts/events.md        @berat
+/.github/                   @berat
+/docker-compose.prod.yml    @berat
+
+# --- Damla · Hesap & Veri ---
+/services/core/             @damla
+/contracts/schemas/         @damla
+/docker-compose.yml         @damla
+/.env.example               @damla
+/Makefile                   @damla
+/infra/                     @damla
+
+# --- Ortak: üç onay gerekir ---
+/contracts/DECISIONS.md     @esra @berat @damla
+/YOL_HARITASI.md            @esra @berat @damla
+/BACKLOG.md                 @esra @berat @damla

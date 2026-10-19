@@ -1,0 +1,38 @@
+[
+  {
+    "id": 884,
+    "plate": "01ABC123",
+    "lot_id": 1,
+    "slot_id": 42,
+    "slot_code": "K2-018",
+    "entry_at": "2026-10-19T14:32:01Z",
+    "exit_at": "2026-10-19T16:05:44Z",
+    "duration_min": 94,
+    "fee_cents": 3290,
+    "status": "closed"
+  },
+  {
+    "id": 885,
+    "plate": "34XYZ987",
+    "lot_id": 1,
+    "slot_id": 7,
+    "slot_code": "K1-007",
+    "entry_at": "2026-10-19T15:10:00Z",
+    "exit_at": null,
+    "duration_min": null,
+    "fee_cents": null,
+    "status": "open"
+  },
+  {
+    "id": 886,
+    "plate": "06DEF456",
+    "lot_id": 1,
+    "slot_id": 95,
+    "slot_code": "K3-015",
+    "entry_at": "2026-10-19T15:48:12Z",
+    "exit_at": null,
+    "duration_min": null,
+    "fee_cents": null,
+    "status": "open"
+  }
+]
