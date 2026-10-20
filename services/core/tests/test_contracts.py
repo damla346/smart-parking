@@ -11,6 +11,7 @@ zorunda (YOL_HARITASI.md §6).
 from __future__ import annotations
 
 import json
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -58,7 +59,7 @@ def test_tarife_kademeleri_bosluksuz_ve_ortusmez() -> None:
     )
     assert kurallar[0].from_min == 0, "ilk kademe 0'dan başlamalı"
     assert kurallar[-1].to_min is None, "son kademe açık uçlu olmalı"
-    for onceki, sonraki in zip(kurallar, kurallar[1:]):
+    for onceki, sonraki in pairwise(kurallar):
         assert onceki.to_min == sonraki.from_min, (
             f"kademeler arasında boşluk/örtüşme: {onceki.to_min} → {sonraki.from_min}"
         )
