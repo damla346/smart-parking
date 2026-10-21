@@ -1,0 +1,32 @@
+# Sahip: Damla (YOL_HARITASI.md §10 — platform farkları).
+#
+# Ekipte karışık işletim sistemi var: Damla Ubuntu, Esra ve Berat Windows.
+# Windows'ta Git'in varsayılanı dosyaları CRLF'e çevirmek; o hâlde commit edilen
+# bir dosya diff'te "bütün satırlar değişti" gibi görünür, review imkânsızlaşır
+# ve CODEOWNERS sahipliği anlamsızlaşır. Aşağıdaki kural depodaki her metin
+# dosyasının LF ile saklanmasını garanti eder — CI de ubuntu-latest'ta koşuyor.
+#
+# Bu dosya ekip depoyu klonlamadan önce eklendi; sonradan eklenirse bir kerelik
+# "tüm dosyalar değişti" commit'i gerekirdi.
+
+# Metin dosyaları: çalışma kopyası ne olursa olsun, depoda LF.
+* text=auto eol=lf
+
+# Makefile'da girinti SEKME olmak zorunda ve satır sonu LF olmalı,
+# yoksa "missing separator" ile kırılır.
+Makefile text eol=lf
+
+# Konteyner içinde koşan dosyalar: CRLF'li bir shell/SQL betiği Linux'ta
+# "\r: command not found" verir.
+*.sh   text eol=lf
+*.sql  text eol=lf
+
+# İkili dosyalar: dönüştürülmesin, diff'lenmesin (sunum/demo varlıkları için).
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.woff  binary
+*.woff2 binary

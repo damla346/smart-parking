@@ -591,6 +591,7 @@ yok**, dolayısıyla son haftada toplu bekleme de yok.
 | Çakışma çıktı | Muhtemelen ortak dosyadasın (§4) — sahibine danış |
 | İşim bitti, boşum | `BACKLOG.md`'den tek iş çek (WIP = 1) |
 | Hazır gelen kodu kim yazdı, ne yapacağım? | §17 |
+| Windows'tayım, WSL2/Docker kurmam gerekir mi? | §18 |
 
 ---
 
@@ -649,3 +650,65 @@ ritüel var ve Gün 0'da yapılır:
 - Makinede `python3-venv` yok: `sudo apt install python3-venv` gerekiyor.
 
 Gün 0'ın ilk işi bu üçünü kapatmak olsun.
+
+---
+
+## 18. Platform farkları — karışık işletim sistemi
+
+Damla Ubuntu 22.04'te, Esra ve Berat Windows'ta. Bu bölüm Gün 0'da üçü tarafından
+okunur; buradaki dört madde yoksayılırsa her biri yarım gün yakar.
+
+### Kim neyi kurar
+
+| | WSL2 | Docker | Ne zaman |
+|---|---|---|---|
+| **Damla** | gerekmiyor (zaten Ubuntu) | **Docker Engine** — Postgres + Redis | Gün 0 |
+| **Berat** | evet (Docker Desktop'ın önkoşulu) | **Docker Desktop** — yalnız `redis` | `ws/bridge.py`'ye başlarken |
+| **Esra** | gerekmiyor | gerekmiyor | — |
+
+**Esra'ya ikisi de gerekmiyor:** Node/Vite Windows'ta natif çalışır, `make`'e ihtiyacı
+yok (`npm run dev` yeter) ve `VITE_USE_MOCK=true` iken `mock_gateway:8100`'e karşı
+çalıştığı için veritabanı hiç görmez. İsterse WSL2'ye geçebilir — tek getirisi
+havuz görevi #4'te Berat'la ortam farkının sıfırlanması.
+
+**Berat'a hemen gerekmiyor:** Python ve `uvicorn` Windows'ta natif kurulur, testleri
+Redis ayakta değilken de geçer (iskelette 16 test öyle geçti). Ama `ws/bridge.py`
+gerçek bir Redis sunucusu ister ve **Redis'in natif Windows sürümü yok** — orada
+Docker zorunlu. `docker compose up -d redis` yeter; §2'deki yönlü kural gereği
+Postgres'e dokunmaz.
+
+**Damla'da Docker Desktop değil Docker Engine:** Desktop, Windows/macOS'ta arkada bir
+Linux sanal makinesi (WSL2) kaldıran sarmalayıcıdır. Gerçek Ubuntu'da bu katman
+gereksiz; `docker-ce` + `docker-compose-plugin` doğru kurulum.
+
+### Satır sonları — `.gitattributes`
+
+Windows'ta Git'in varsayılanı dosyaları CRLF'e çevirmek. O hâlde commit edilen bir
+dosya diff'te "bütün satırlar değişti" gibi görünür: review imkânsızlaşır, CODEOWNERS
+sahipliği anlamsızlaşır, CI (`ubuntu-latest`) ile kodun davranışı ayrışır.
+
+Depoda `.gitattributes` var ve her metin dosyasını LF'e sabitliyor. **Kimse bunu
+devre dışı bırakmasın**, `core.autocrlf` ile oynamasın. `Makefile`, `*.sh` ve `*.sql`
+ayrıca listelendi: make girintide sekme bekler, konteyner içinde koşan CRLF'li bir
+betik ise `\r: command not found` verir.
+
+### WSL2 kullananlar: depo nereye klonlanır
+
+Depo **WSL'in kendi diskinde** olmalı (`~/smart_parking_ws`), Windows diskinde
+**değil** (`/mnt/c/Users/...`). Windows diskinde dosya değişiklik bildirimleri sınırı
+geçemez; `npm run dev` (HMR) ve `uvicorn --reload` ya çok yavaşlar ya hiç tetiklenmez.
+Dosyalara Windows tarafından erişmek için VS Code'un WSL eklentisi kullanılır —
+depoyu taşımak gerekmez.
+
+### Makefile Windows'ta çalışmaz
+
+`make` cmd/PowerShell'de yok; ayrıca `mocks` hedefi `&` ile arka plana atıyor ve
+`cd web && ...` kullanıyor — ikisi de bash sözdizimi. [Makefile](Makefile) bir
+kolaylıktır, zorunluluk değil: README'deki kişi başı ham komutlar her platformda
+aynı işi yapar. WSL2 kullananlarda Makefile normal çalışır.
+
+### Port çakışması
+
+Windows'ta kurulu bir PostgreSQL varsa 5432 tutulu olur ve compose kalkmaz.
+`.env` içindeki `POSTGRES_PORT` (ve `REDIS_PORT`) bunun için override edilebilir
+bırakıldı — değiştiren `DATABASE_URL`'i de güncellemeyi unutmasın.
