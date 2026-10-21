@@ -2,25 +2,27 @@
 # GitHub kullanıcı adlarını gerçek hesaplarla değiştirin.
 
 # --- Esra · Frontend ---
-/web/                       @esra
-/contracts/fixtures/        @esra
+/web/                       @esrack0
+/contracts/fixtures/        @esrack0
 
 # --- Berat · İletişim ---
-/services/gateway/          @berat
-/contracts/openapi.yaml     @berat
-/contracts/events.md        @berat
-/.github/                   @berat
-/docker-compose.prod.yml    @berat
+/services/gateway/          @beratkaan38
+/contracts/openapi.yaml     @beratkaan38
+/contracts/events.md        @beratkaan38
+/.github/                   @beratkaan38
+/docker-compose.prod.yml    @beratkaan38
 
 # --- Damla · Hesap & Veri ---
-/services/core/             @damla
-/contracts/schemas/         @damla
-/docker-compose.yml         @damla
-/.env.example               @damla
-/Makefile                   @damla
-/infra/                     @damla
+/services/core/             @damla346
+/contracts/schemas/         @damla346
+/docker-compose.yml         @damla346
+/.env.example               @damla346
+/Makefile                   @damla346
+/infra/                     @damla346
 
-# --- Ortak: üç onay gerekir ---
-/contracts/DECISIONS.md     @esra @berat @damla
-/YOL_HARITASI.md            @esra @berat @damla
-/BACKLOG.md                 @esra @berat @damla
+# --- Ortak: üçü de reviewer olarak atanır ---
+# Dikkat: GitHub bir satırdaki owner'lardan YALNIZCA BİRİNİN onayını yeterli sayar.
+# Üçü de otomatik reviewer atanır ama merge için tek onay yeter.
+/contracts/DECISIONS.md     @esrack0 @beratkaan38 @damla346
+/YOL_HARITASI.md            @esrack0 @beratkaan38 @damla346
+/BACKLOG.md                 @esrack0 @beratkaan38 @damla346
