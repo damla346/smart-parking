@@ -8,6 +8,13 @@ on:
   push:
     branches: [main]
 
+# paths-filter, PR'da değişen dosyaları GitHub API'sinden okur; bunun için
+# pull-requests: read şart. Repo varsayılanı bu izni vermediği için
+# "Resource not accessible by integration" hatası alınıyordu.
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   degisenler:
     runs-on: ubuntu-latest
