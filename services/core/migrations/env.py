@@ -3,10 +3,18 @@
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from core.config import settings
 from core.db import Base
 from core.models import *  # noqa: F403  tüm tabloların metadata'ya kaydı için
 
 config = context.config
+
+# Veritabanı adresi alembic.ini'de DEĞİL, uygulamayla aynı kaynakta tutuluyor:
+# ortam değişkeni → .env → core/config.py'deki varsayılan. İki yerde tekrarlanan
+# adres ayrışır: .env'de POSTGRES_PORT değiştiğinde uygulama yeni porta giderken
+# alembic eskisini arar ve hata sebebini söylemez (YOL_HARITASI §18, port çakışması).
+config.set_main_option("sqlalchemy.url", settings.database_url)
+
 target_metadata = Base.metadata
 
 
