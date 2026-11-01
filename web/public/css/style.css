@@ -4,8 +4,10 @@
    ========================================================================== */
 
 :root {
-  --bg-canvas: #fff0f5;          /* Toz pembe ferah zemin */
-  --bg-surface: #ffffff;         /* Beyaz kartlar */
+  --bg-canvas: #fff0f5;
+  /* Toz pembe ferah zemin */
+  --bg-surface: #ffffff;
+  /* Beyaz kartlar */
   --bg-surface-elevated: #fff5f8;
   --bg-surface-hover: #ffe4ec;
 
@@ -13,20 +15,24 @@
   --border-strong: #fbcfe8;
   --border-focus: #f43f5e;
 
-  --text-primary: #1e1b4b;       /* Derin zarif mürdüm / lacivert */
+  --text-primary: #1e1b4b;
+  /* Derin zarif mürdüm / lacivert */
   --text-secondary: #64748b;
   --text-muted: #94a3b8;
 
-  --accent: #f43f5e;             /* Gül pembesi */
+  --accent: #f43f5e;
+  /* Gül pembesi */
   --accent-hover: #e11d48;
   --accent-gradient: linear-gradient(135deg, #fb7185, #f43f5e);
 
-  --color-free: #10b981;         /* Yeşil - Boş */
+  --color-free: #10b981;
+  /* Yeşil - Boş */
   --color-free-bg: #ecfdf5;
   --color-free-border: #a7f3d0;
   --color-free-text: #065f46;
 
-  --color-occupied: #f43f5e;     /* Kırmızı - Dolu */
+  --color-occupied: #f43f5e;
+  /* Kırmızı - Dolu */
   --color-occupied-bg: #fff1f2;
   --color-occupied-border: #fecdd3;
   --color-occupied-text: #9f1239;
@@ -289,8 +295,15 @@ body {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(3px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ==========================================================================
@@ -382,9 +395,17 @@ body {
   margin-top: 6px;
 }
 
-.stat-card.tone-emerald .stat-value { color: #059669; }
-.stat-card.tone-rose .stat-value { color: #e11d48; }
-.stat-card.tone-pink .stat-value { color: #f43f5e; }
+.stat-card.tone-emerald .stat-value {
+  color: #059669;
+}
+
+.stat-card.tone-rose .stat-value {
+  color: #e11d48;
+}
+
+.stat-card.tone-pink .stat-value {
+  color: #f43f5e;
+}
 
 /* Dashboard Kat Kartları (İlk Sistemdeki Şık Düzen) */
 .floors-breakdown-grid {
@@ -491,6 +512,7 @@ body {
   padding-right: 5px;
   font-size: 10px;
 }
+
 .tr-plate.plate-sm .tr-plate-blue {
   width: 12px;
   height: 100%;
@@ -503,6 +525,7 @@ body {
   padding-right: 9px;
   font-size: 14px;
 }
+
 .tr-plate.plate-md .tr-plate-blue {
   width: 18px;
   height: 100%;
@@ -517,6 +540,7 @@ body {
   border-width: 2px;
   border-radius: 5px;
 }
+
 .tr-plate.plate-lg .tr-plate-blue {
   width: 26px;
   height: 100%;
@@ -626,8 +650,13 @@ body {
   font-weight: 700;
 }
 
-.gate-indicator.entry { color: #059669; }
-.gate-indicator.exit { color: #e11d48; }
+.gate-indicator.entry {
+  color: #059669;
+}
+
+.gate-indicator.exit {
+  color: #e11d48;
+}
 
 .driving-lane-divider {
   margin: 20px 0;
@@ -678,6 +707,7 @@ body {
   border-color: rgba(16, 185, 129, 0.4);
   background: #fafdfb;
 }
+
 .slot-bay.status-free:hover {
   border-color: #059669;
   background: #ecfdf5;
@@ -687,6 +717,7 @@ body {
   border-color: rgba(244, 63, 94, 0.35);
   background: #fff8f9;
 }
+
 .slot-bay.status-occupied:hover {
   border-color: #e11d48;
 }
@@ -712,9 +743,19 @@ body {
   color: var(--text-secondary);
 }
 
-.slot-type-icon.disabled { color: var(--color-disabled); background: var(--color-disabled-bg); }
-.slot-type-icon.ev { color: var(--color-ev); background: var(--color-ev-bg); }
-.slot-type-icon.large { color: var(--color-large); }
+.slot-type-icon.disabled {
+  color: var(--color-disabled);
+  background: var(--color-disabled-bg);
+}
+
+.slot-type-icon.ev {
+  color: var(--color-ev);
+  background: var(--color-ev-bg);
+}
+
+.slot-type-icon.large {
+  color: var(--color-large);
+}
 
 .slot-middle {
   text-align: center;
@@ -798,10 +839,29 @@ body {
   border-style: solid;
 }
 
-.corner-tl { top: 0; left: 0; border-width: 2.5px 0 0 2.5px; }
-.corner-tr { top: 0; right: 0; border-width: 2.5px 2.5px 0 0; }
-.corner-bl { bottom: 0; left: 0; border-width: 0 0 2.5px 2.5px; }
-.corner-br { bottom: 0; right: 0; border-width: 0 2.5px 2.5px 0; }
+.corner-tl {
+  top: 0;
+  left: 0;
+  border-width: 2.5px 0 0 2.5px;
+}
+
+.corner-tr {
+  top: 0;
+  right: 0;
+  border-width: 2.5px 2.5px 0 0;
+}
+
+.corner-bl {
+  bottom: 0;
+  left: 0;
+  border-width: 0 0 2.5px 2.5px;
+}
+
+.corner-br {
+  bottom: 0;
+  right: 0;
+  border-width: 0 2.5px 2.5px 0;
+}
 
 .laser-scanner-line {
   position: absolute;
@@ -815,9 +875,20 @@ body {
 }
 
 @keyframes scanLaser {
-  0% { top: 10%; opacity: 0.3; }
-  50% { top: 90%; opacity: 1; }
-  100% { top: 10%; opacity: 0.3; }
+  0% {
+    top: 10%;
+    opacity: 0.3;
+  }
+
+  50% {
+    top: 90%;
+    opacity: 1;
+  }
+
+  100% {
+    top: 10%;
+    opacity: 0.3;
+  }
 }
 
 .hud-overlay-text {
@@ -870,6 +941,7 @@ body {
   color: #fff;
   box-shadow: 0 2px 8px rgba(244, 63, 94, 0.3);
 }
+
 .btn-primary:hover {
   background: #e11d48;
 }
@@ -878,6 +950,7 @@ body {
   background: #059669;
   color: #fff;
 }
+
 .btn-success:hover {
   background: #047857;
 }
@@ -886,6 +959,7 @@ body {
   background: #e11d48;
   color: #fff;
 }
+
 .btn-danger:hover {
   background: #be123c;
 }
@@ -895,6 +969,7 @@ body {
   border-color: var(--border-strong);
   color: var(--text-primary);
 }
+
 .btn-secondary:hover {
   background: #fff5f8;
 }
@@ -1022,10 +1097,21 @@ body {
   border-top: 4px solid #f43f5e;
 }
 
-.tariff-card.tier-free { border-top-color: #10b981; }
-.tariff-card.tier-1 { border-top-color: #f43f5e; }
-.tariff-card.tier-2 { border-top-color: #8b5cf6; }
-.tariff-card.tier-3 { border-top-color: #f59e0b; }
+.tariff-card.tier-free {
+  border-top-color: #10b981;
+}
+
+.tariff-card.tier-1 {
+  border-top-color: #f43f5e;
+}
+
+.tariff-card.tier-2 {
+  border-top-color: #8b5cf6;
+}
+
+.tariff-card.tier-3 {
+  border-top-color: #f59e0b;
+}
 
 .tariff-card:hover {
   box-shadow: var(--shadow-md);
@@ -1043,10 +1129,25 @@ body {
   margin-bottom: 8px;
 }
 
-.tariff-card.tier-free .tariff-tier-badge { background: #ecfdf5; color: #065f46; }
-.tariff-card.tier-1 .tariff-tier-badge { background: #fff1f2; color: #9f1239; }
-.tariff-card.tier-2 .tariff-tier-badge { background: #f5f3ff; color: #5b21b6; }
-.tariff-card.tier-3 .tariff-tier-badge { background: #fffbeb; color: #92400e; }
+.tariff-card.tier-free .tariff-tier-badge {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.tariff-card.tier-1 .tariff-tier-badge {
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.tariff-card.tier-2 .tariff-tier-badge {
+  background: #f5f3ff;
+  color: #5b21b6;
+}
+
+.tariff-card.tier-3 .tariff-tier-badge {
+  background: #fffbeb;
+  color: #92400e;
+}
 
 .tariff-range {
   font-size: 16px;
@@ -1167,7 +1268,8 @@ body {
   transition: all 0.15s;
 }
 
-.preset-chip:hover, .preset-chip.active {
+.preset-chip:hover,
+.preset-chip.active {
   background: #f43f5e;
   color: #ffffff;
   border-color: #f43f5e;
@@ -1394,7 +1496,9 @@ body {
   line-height: 1;
 }
 
-.modal-close-btn:hover { color: #f43f5e; }
+.modal-close-btn:hover {
+  color: #f43f5e;
+}
 
 .modal-body {
   padding: 20px;
@@ -1443,8 +1547,14 @@ body {
   margin-bottom: 5px;
 }
 
-.receipt-label { color: #64748b; }
-.receipt-value { font-weight: 700; color: #1e1b4b; }
+.receipt-label {
+  color: #64748b;
+}
+
+.receipt-value {
+  font-weight: 700;
+  color: #1e1b4b;
+}
 
 .receipt-divider {
   border-top: 1px dashed #fbcfe8;
@@ -1498,25 +1608,65 @@ body {
   max-width: 380px;
 }
 
-.toast.toast-success { border-left: 4px solid #10b981; }
-.toast.toast-danger { border-left: 4px solid #f43f5e; }
-.toast.toast-info { border-left: 4px solid #38bdf8; }
+.toast.toast-success {
+  border-left: 4px solid #10b981;
+}
+
+.toast.toast-danger {
+  border-left: 4px solid #f43f5e;
+}
+
+.toast.toast-info {
+  border-left: 4px solid #38bdf8;
+}
 
 @keyframes slideToast {
-  from { transform: translateX(20px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 /* Responsive */
 @media (max-width: 1024px) {
-  .tariff-grid, .calc-widget-grid, .anpr-grid { grid-template-columns: 1fr; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .floors-breakdown-grid { grid-template-columns: 1fr; }
+
+  .tariff-grid,
+  .calc-widget-grid,
+  .anpr-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .floors-breakdown-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 768px) {
-  .app-main { padding: 14px; }
-  .header-top { flex-direction: column; align-items: flex-start; gap: 10px; }
-  .header-controls { width: 100%; justify-content: space-between; }
-  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .app-main {
+    padding: 14px;
+  }
+
+  .header-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .header-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 }
