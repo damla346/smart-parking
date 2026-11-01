@@ -169,6 +169,16 @@ body {
   background: #f43f5e;
 }
 
+.status-badge.connected.mock {
+  background: #f0fdf4;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.status-badge.connected.mock .status-dot {
+  background: #22c55e;
+}
+
 .simulation-toggle {
   display: flex;
   align-items: center;

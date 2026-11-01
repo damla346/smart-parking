@@ -7,8 +7,10 @@
 (function (window) {
   'use strict';
 
-  // Sunucu adresleri (YOL_HARITASI §6)
-  const WS_URL_MOCK = 'ws://localhost:8100/ws/occupancy';
+  // Sunucu adresleri (Berat'ın gerçek gateway'i: 8000, Mock gateway: 8100)
+  const WS_URL_GATEWAY = 'ws://localhost:8000/ws/occupancy'; // Berat'ın gateway servisi (gateway/config.py:14)
+  const WS_URL_MOCK = 'ws://localhost:8100/ws/occupancy';    // infra/mocks/mock_gateway.py
+  const REST_URL_GATEWAY = 'http://localhost:8000';
   const REST_URL_MOCK = 'http://localhost:8100';
 
   class ParkingStore {
@@ -397,24 +399,62 @@
     }
 
     /**
-     * WebSocket bağlantısını dener (Backend çalışıyorsa entegre olur)
+     * WebSocket bağlantısını dener:
+     * 1. Önce Berat'ın gerçek gateway'i (port 8000) taranır.
+     * 2. Kapalıysa mock_gateway (port 8100) taranır.
+     * 3. İkisi de yoksa yerel simülasyon aktif kalır, 10 sn sonra yeniden denenir.
      */
     tryWebSocket() {
       if (typeof WebSocket === 'undefined') return;
 
+      const params = typeof window !== 'undefined' && window.location ? new URLSearchParams(window.location.search) : null;
+      const forceMock = params && (params.get('mock') === 'true' || params.get('use_mock') === 'true' || params.get('port') === '8100');
+      const forceGateway = params && (params.get('gateway') === 'true' || params.get('port') === '8000');
+
+      let targets = [WS_URL_GATEWAY, WS_URL_MOCK];
+      if (forceMock) {
+        targets = [WS_URL_MOCK];
+      } else if (forceGateway) {
+        targets = [WS_URL_GATEWAY];
+      }
+
+      this.connectWebSocketCandidates(targets, 0);
+    }
+
+    connectWebSocketCandidates(targets, index) {
+      if (index >= targets.length) {
+        this.connectionStatus = 'simulated';
+        this.connectedUrl = null;
+        this.notifySubscribers({ event: 'connection.change', status: 'simulated', url: null });
+        this.scheduleWsReconnect();
+        return;
+      }
+
+      const targetUrl = targets[index];
+      const isGateway = targetUrl.includes(':8000');
+      let opened = false;
+
       try {
-        const ws = new WebSocket(WS_URL_MOCK);
+        const ws = new WebSocket(targetUrl);
 
         ws.onopen = () => {
-          this.connectionStatus = 'connected';
-          this.notifySubscribers({ event: 'connection.change', status: 'connected' });
+          opened = true;
+          this.ws = ws;
+          this.connectedUrl = targetUrl;
+          this.connectionStatus = isGateway ? 'connected_gateway' : 'connected_mock';
+          this.notifySubscribers({
+            event: 'connection.change',
+            status: this.connectionStatus,
+            url: targetUrl,
+            mode: isGateway ? 'Gerçek Gateway (8000)' : 'Mock Gateway (8100)',
+          });
         };
 
         ws.onmessage = (ev) => {
           try {
             const msg = JSON.parse(ev.data);
             if (msg.event === 'lot.occupancy' && msg.data) {
-              // Harici WS'ten gelen doluluk güncellemesi
+              this.applyExternalOccupancy(msg.data);
               this.notifySubscribers({ event: 'external.occupancy', data: msg.data });
             }
           } catch (e) {
@@ -423,24 +463,61 @@
         };
 
         ws.onclose = () => {
-          this.connectionStatus = 'simulated';
-          this.notifySubscribers({ event: 'connection.change', status: 'simulated' });
-          // Periyodik yeniden bağlanma denemesi (üstel bekleme gerekirse)
-          if (!this.wsRetryTimer) {
-            this.wsRetryTimer = setTimeout(() => {
-              this.wsRetryTimer = null;
-              this.tryWebSocket();
-            }, 10000);
+          if (!opened) {
+            // Port kapalıysa bir sonraki adayı dene
+            this.connectWebSocketCandidates(targets, index + 1);
+          } else {
+            // Açık bağlantı koptuysa yerel simülasyona dön ve yeniden denemeyi planla
+            this.connectionStatus = 'simulated';
+            this.connectedUrl = null;
+            this.notifySubscribers({ event: 'connection.change', status: 'simulated', url: null });
+            this.scheduleWsReconnect();
           }
         };
 
         ws.onerror = () => {
-          ws.close();
+          try { ws.close(); } catch (_) {}
         };
-
-        this.ws = ws;
       } catch (err) {
-        this.connectionStatus = 'simulated';
+        this.connectWebSocketCandidates(targets, index + 1);
+      }
+    }
+
+    scheduleWsReconnect() {
+      if (!this.wsRetryTimer) {
+        this.wsRetryTimer = setTimeout(() => {
+          this.wsRetryTimer = null;
+          this.tryWebSocket();
+        }, 10000);
+      }
+    }
+
+    applyExternalOccupancy(data) {
+      if (!data) return;
+      this.externalOccupancy = data;
+      if (Array.isArray(data.by_floor)) {
+        for (const extFloor of data.by_floor) {
+          const localFloor = this.floors.find((f) => f.level === extFloor.level || f.id === extFloor.floor_id);
+          if (localFloor && typeof extFloor.occupied === 'number') {
+            const currentOccupied = localFloor.slots.filter((s) => s.status === 'occupied').length;
+            const diff = extFloor.occupied - currentOccupied;
+            if (diff > 0) {
+              const freeSlots = localFloor.slots.filter((s) => s.status === 'free');
+              for (let i = 0; i < Math.min(diff, freeSlots.length); i++) {
+                freeSlots[i].status = 'occupied';
+                freeSlots[i].plate = window.ANPR.rastgelePlaka();
+                freeSlots[i].entry_at = new Date().toISOString();
+              }
+            } else if (diff < 0) {
+              const occSlots = localFloor.slots.filter((s) => s.status === 'occupied');
+              for (let i = 0; i < Math.min(Math.abs(diff), occSlots.length); i++) {
+                occSlots[i].status = 'free';
+                occSlots[i].plate = null;
+                occSlots[i].entry_at = null;
+              }
+            }
+          }
+        }
       }
     }
 

@@ -27,6 +27,7 @@
     initTariffSimulator();
     initSessionsControls();
     initModals();
+    updateConnectionBadge();
 
     // Store değişikliklerini dinle
     if (window.ParkingStore && typeof window.ParkingStore.subscribe === 'function') {
@@ -839,7 +840,34 @@ function showToast(message, type = 'info') {
 }
 
 function handleStoreUpdate(payload) {
+  if (payload && payload.event === 'connection.change') {
+    updateConnectionBadge(payload);
+  }
   renderAll();
+}
+
+function updateConnectionBadge(payload) {
+  const badge = document.getElementById('connection-status-badge');
+  const textEl = document.getElementById('connection-status-text');
+  if (!badge || !textEl) return;
+
+  const status = payload ? payload.status : (window.ParkingStore ? window.ParkingStore.connectionStatus : 'simulated');
+  badge.className = 'status-badge';
+
+  if (status === 'connected_gateway') {
+    badge.classList.add('connected');
+    textEl.textContent = 'Canlı Gateway (8000)';
+    badge.title = "Berat'ın Gateway servisine bağlı (ws://localhost:8000/ws/occupancy)";
+  } else if (status === 'connected_mock') {
+    badge.classList.add('connected');
+    badge.classList.add('mock');
+    textEl.textContent = 'Mock Gateway (8100)';
+    badge.title = 'Mock Gateway servisine bağlı (ws://localhost:8100/ws/occupancy)';
+  } else {
+    badge.classList.add('simulated');
+    textEl.textContent = 'Yerel Simülasyon';
+    badge.title = 'Backend kapalı; yerel simülatör devrede (8000 ve 8100 portları taranıyor)';
+  }
 }
 
 function renderAll() {
