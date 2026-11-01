@@ -18,11 +18,15 @@ mocks:             ## gün 0 sahteleri: mock_core:8101 + mock_gateway:8100
 	python infra/mocks/mock_core.py & \
 	python infra/mocks/mock_gateway.py
 
+# contracts/ kurulabilir bir paket değil, depo kökünden import ediliyor. pytest bunu
+# pyproject'teki pythonpath ile, alembic ise alembic.ini'deki prepend_sys_path ile
+# çözüyor; uvicorn'un karşılığı yok, o yüzden PYTHONPATH burada veriliyor. Olmazsa
+# servis "No module named 'contracts'" ile açılmıyor.
 core:              ## Damla
-	cd services/core && uvicorn core.main:app --reload --port 8001
+	cd services/core && PYTHONPATH=../.. uvicorn core.main:app --reload --port 8001
 
 gateway:           ## Berat
-	cd services/gateway && uvicorn gateway.main:app --reload --port 8000
+	cd services/gateway && PYTHONPATH=../.. uvicorn gateway.main:app --reload --port 8000
 
 web:               ## Esra
 	cd web && npm run dev

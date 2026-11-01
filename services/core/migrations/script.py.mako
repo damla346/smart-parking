@@ -8,7 +8,11 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
-${imports if imports else ""}
+## Mako koşul satırı çıktıya basılmaz: imports boşken fazladan boş satır oluşmaz.
+## Düz ${imports if imports else ""} kullanılırsa her migration ruff I001 ile CI'ı kırar.
+% if imports:
+${imports}
+% endif
 
 revision: str = ${repr(up_revision)}
 down_revision: str | None = ${repr(down_revision)}
