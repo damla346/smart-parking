@@ -30,6 +30,25 @@ Yazan: Damla · Durum: onaylandı
 
 <!-- Yeni kararları buraya ekleyin -->
 
+## 2026-11-01 · Frontend teknoloji yığını: vanilla
+Varsayım: `web/` **saf HTML + CSS + JavaScript** ile yazılır; React/Vite/Tailwind/TS
+kullanılmaz. Gerekçe: sunumda `node_modules` ve derleme zincirine bağımlı kalmamak —
+`index.html` doğrudan `file://` ile açılabiliyor, çökme riski sıfırlanıyor. Sözleşme
+sınırı değişmiyor: haberleşme yine `contracts/openapi.yaml` + `contracts/events.md`
+üzerinden JSON ve WebSocket ile. Karar `/web/` sahibine ait (CODEOWNERS).
+Takip: `src/` React iskeleti ve build yapılandırması kaldırılacak (PR #6).
+Not: `file://` üzerinden `fetch()` CORS'a çarpar — REST uçları kullanılacaksa bu
+avantaj kaybolur, bilinçli takas.
+Yazan: Esra (kayda geçiren: Damla) · Durum: onaylandı
+
+## 2026-11-01 · Tarife motorunun frontend kopyası
+Varsayım: ücret hesabının **tek kaynağı `services/core/core/domain/pricing.py`**.
+`web/js/tariff.js` onun portu olarak kalabilir, ancak aynı girdiye aynı kuruşu
+döndürdüğünü kilitleyen bir test olmadan kopya tutulmaz — alternatifi
+`POST /tariffs/quote` ucunu tüketmek. Gerekçe: `pricing.py`'de tavan ücret ve kademe
+boşluğu halen açık; iki motor ayrışırsa ekranla veritabanı farklı toplam gösterir.
+Yazan: Damla · Durum: doğrulanacak
+
 ## ŞABLON · Mükerrer giriş (henüz karara bağlanmadı)
 Varsayım: aynı plaka açık oturumu varken tekrar giriş yaparsa eskisi otomatik kapanır
 ve ücreti hesaplanır.

@@ -33,7 +33,7 @@ zaman tam bağımsız çalışmadır.
 ```
                  ┌──────────────────────────────┐
    Tarayıcı ──── │  web/           (Esra)       │
-                 │  React + Vite + TS           │
+                 │  Vanilla HTML + CSS + JS     │
                  └───────┬──────────────┬───────┘
                       REST            WebSocket
                          │              │
@@ -225,20 +225,16 @@ smart_parking_ws/
 │       │   └── clients/core_client.py
 │       └── tests/                  test_ws.py · test_anpr.py · test_session_flow.py
 │
-├── web/                            ══ ESRA
-│   ├── package.json · vite.config.ts · tailwind.config.js · Dockerfile
-│   └── src/
-│       ├── main.tsx · App.tsx
-│       ├── api/
-│       │   ├── client.ts           REST istemcisi (USE_MOCK bayrağını okur)
-│       │   └── socket.ts           ★ WS istemcisi + reconnect
-│       ├── store/occupancy.ts      canlı state
-│       ├── types/                  openapi.yaml'dan üretilir
-│       ├── pages/
-│       │   ├── Dashboard.tsx · FloorPlan.tsx · SessionLog.tsx
-│       │   └── Tariffs.tsx · Reports.tsx          (havuz)
-│       └── components/
-│           ├── SlotGrid.tsx · OccupancyGauge.tsx · LiveBadge.tsx
+├── web/                            ══ ESRA   (derleme yok; file:// ile de açılır)
+│   ├── index.html                  tek sayfa — kat planı, tarife, ANPR, oturum logları
+│   ├── css/style.css
+│   └── js/
+│       ├── store.js                ★ canlı state + WS istemcisi (8000 → 8100 → simülasyon)
+│       ├── tariff.js               kademeli ücret motoru — kaynak: core/domain/pricing.py
+│       ├── anpr.js                 TR plaka üreteç/doğrulayıcı — kaynak: gateway/anpr/plate_gen.py
+│       └── app.js                  DOM render + olay bağlama
+│   (bekleyen temizlik: src/ React iskeleti, vite/tailwind yapılandırması ve web/public/
+│    altındaki ikinci kopya — bkz. PR #6)
 │
 ├── infra/
 │   ├── mocks/
