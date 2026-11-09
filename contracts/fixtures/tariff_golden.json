@@ -10,3 +10,4 @@
   { "duration_min": 480, "expected_cents": 17100, "description": "480 dakika: 4500 + 360 x 35 kr = 17100 kr" },
   { "duration_min": 600, "expected_cents": 19500, "description": "600 dakika: 17100 + 120 x 20 kr = 19500 kr (açık uçlu son kademe)" }
 ]
+

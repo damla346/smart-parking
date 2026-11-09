@@ -91,3 +91,4 @@ if (failedCount > 0) {
   console.log('🔒 web/js/tariff.js ile contracts/fixtures/tariff_golden.json %100 senkronize.');
   process.exit(0);
 }
+
