@@ -43,6 +43,24 @@ class CoreClient:
     async def tariffs(self, lot_id: int) -> Any:
         return await self._get("/tariffs", lot_id=lot_id)
 
+    async def sessions(
+        self,
+        *,
+        plate: str | None = None,
+        lot_id: int | None = None,
+        from_: str | None = None,
+        to: str | None = None,
+        limit: int = 50,
+    ) -> Any:
+        params: dict[str, Any] = {
+            "plate": plate,
+            "lot_id": lot_id,
+            "from": from_,
+            "to": to,
+            "limit": limit,
+        }
+        return await self._get("/sessions", **params)
+
     async def quote(self, session_id: int) -> Any:
         """Oturumu kapatır ve ücret dökümünü döndürür (tarife motoru core'da)."""
         return await self._post("/tariffs/quote", session_id=session_id)
