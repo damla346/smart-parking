@@ -9,7 +9,7 @@
   'use strict';
 
   // Türk plakalarında kullanılmayan harfler: Q, W, X (Berat'ın plate_gen.py kuralları ile %100 uyumlu 23 harf: I ve O dahildir)
-  const GECERLI_HARFLER = 'ABCDEFGHIJKLMNPRSTUVYZ';
+  const GECERLI_HARFLER = 'ABCDEFGHIJKLMNOPRSTUVYZ';
 
   /**
    * Standartlara uygun rastgele bir TR plakası üretir.

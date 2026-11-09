@@ -857,12 +857,17 @@ function updateConnectionBadge(payload) {
   if (status === 'connected_gateway') {
     badge.classList.add('connected');
     textEl.textContent = 'Canlı Gateway (8000)';
-    badge.title = "Berat'ın Gateway servisine bağlı (ws://localhost:8000/ws/occupancy)";
+    badge.title = "Berat'ın Gateway servisine bağlı (ws://localhost:8000/ws/occupancy) - Veri akışı aktif";
   } else if (status === 'connected_mock') {
     badge.classList.add('connected');
     badge.classList.add('mock');
     textEl.textContent = 'Mock Gateway (8100)';
-    badge.title = 'Mock Gateway servisine bağlı (ws://localhost:8100/ws/occupancy)';
+    badge.title = 'Mock Gateway servisine bağlı (ws://localhost:8100/ws/occupancy) - Veri akışı aktif';
+  } else if (status === 'waiting_gateway' || status === 'waiting_mock') {
+    badge.classList.add('waiting');
+    const port = status.includes('gateway') ? '8000' : '8100';
+    textEl.textContent = `Bağlı (${port}), Veri Bekleniyor...`;
+    badge.title = `WebSocket bağlantısı açık (port ${port}), ancak henüz yayın mesajı gelmedi (Redis/Core yayını bekleniyor).`;
   } else {
     badge.classList.add('simulated');
     textEl.textContent = 'Yerel Simülasyon';

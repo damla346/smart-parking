@@ -54,10 +54,17 @@ Projemiz gevşek bağlı (loosely-coupled), bağımsız çalışılabilir üçl�
 ## 👥 Takım Arkadaşlarımız İçin Entegrasyon Notları
 
 ### 🔹 Berat İçin (Gateway, WebSocket & ANPR Entegrasyonu)
-1. **WebSocket Bağlantı Noktası:**
-   - Frontend `web/js/store.js` dosyasında `ws://localhost:8100/ws/occupancy` adresini dinleyecek şekilde yapılandırılmıştır.
-   - Gateway ayağa kalktığında arayüz sağ üstteki rozeti otomatik olarak **"Bağlı (Canlı)"** durumuna getirir.
-   - Gateway kapalıyken veya henüz çalıştırılmadığında arayüz **asla çökmez**; yerel simülasyon moduna geçer (`simulated`).
+1. **WebSocket Bağlantı Noktası ve Otomatik Aday Zinciri:**
+   - Frontend `web/js/store.js` dosyasında çift aday zinciri (`candidate fallback`) ile çalışır:
+     - İlk sırada Berat'ın gerçek Gateway'i (`ws://localhost:8000/ws/occupancy`) taranır.
+     - Port kapalıysa otomatik olarak Mock Gateway (`ws://localhost:8100/ws/occupancy`) denenir.
+     - İkisi de kapalıysa yerel simülatör devreye girer ve 10 saniyede bir arka planda yeniden dener.
+     - Özel testler için URL parametreleri desteklenir: `?gateway=true` (sadece 8000'i dener) veya `?mock=true` (sadece 8100'ü dener).
+   - **Rozet Durumları:**
+     - 🟢 **Canlı Gateway (8000):** Gerçek gateway bağlı ve canlı doluluk mesajları akıyor.
+     - 🟢 **Mock Gateway (8100):** Mock gateway bağlı ve test mesajları akıyor.
+     - 🟡 **Bağlı (8000 / 8100), Veri Bekleniyor...:** WebSocket portu açık ancak henüz Redis/Core yayını ulaşmadı (yanıltıcı durumu engeller).
+     - 🌸 **Yerel Simülasyon:** Hiçbir gateway ayakta değilken demo'nun kesintisiz sürmesi için bağımsız simülasyon.
 2. **WebSocket Olay Şeması (`contracts/events.md`):**
    - Frontend şu formatta gelen mesajları doğrudan karşılar:
      ```json
@@ -78,7 +85,7 @@ Projemiz gevşek bağlı (loosely-coupled), bağımsız çalışılabilir üçl�
      }
      ```
 3. **ANPR Kuralları:**
-   - `web/js/anpr.js` içerisindeki plaka üretim ve doğrulama mantığı senin yazdığın `plate_gen.py` ile birebir aynı kuralları uygular.
+   - `web/js/anpr.js` içerisindeki plaka üretim ve doğrulama mantığı, `services/gateway/gateway/anpr/plate_gen.py` ile %100 birebir aynı kuralları uygular (23 harfli küme: Q, W, X hariç; I ve O dahil). Hem `34IBC12` hem de `06OZK345` gibi I/O içeren plakalar eksiksiz doğrulanır.
 
 ### 🔹 Damla İçin (Core, Tarife Motoru & Veri Uyumu)
 1. **Kademeli Tarife Uyumu (`pricing.py`):**
@@ -141,9 +148,12 @@ npm install
 npm run dev
 ```
 
-### Gateway (Mock) ile Test Etmek İçin:
+### Gateway ile Test Etmek İçin:
 ```bash
-# Proje kök dizininde:
+# Gerçek Gateway ile test (Port 8000):
+# Gateway servisini başlattığınızda arayüz doğrudan bağlanır.
+
+# Mock Gateway ile test (Port 8100):
 python infra/mocks/mock_gateway.py
 ```
-Arayüz, `ws://localhost:8100/ws/occupancy` yayınını otomatik olarak yakalayıp gerçek zamanlı verilerle senkronize olacaktır.
+Arayüz, `ws://localhost:8000/ws/occupancy` veya `ws://localhost:8100/ws/occupancy` yayınını otomatik olarak yakalayıp gerçek zamanlı verilerle senkronize olacaktır. İsteğe göre tarayıcıda `index.html?gateway=true` veya `index.html?mock=true` şeklinde tek bir porta odaklanarak da çalıştırabilirsiniz.

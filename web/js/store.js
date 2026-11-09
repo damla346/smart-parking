@@ -10,8 +10,6 @@
   // Sunucu adresleri (Berat'ın gerçek gateway'i: 8000, Mock gateway: 8100)
   const WS_URL_GATEWAY = 'ws://localhost:8000/ws/occupancy'; // Berat'ın gateway servisi (gateway/config.py:14)
   const WS_URL_MOCK = 'ws://localhost:8100/ws/occupancy';    // infra/mocks/mock_gateway.py
-  const REST_URL_GATEWAY = 'http://localhost:8000';
-  const REST_URL_MOCK = 'http://localhost:8100';
 
   class ParkingStore {
     constructor() {
@@ -28,8 +26,11 @@
       this.subscribers = new Set();
       this.cameraLogs = [];
 
-      // Bağlantı durumu: 'connected' | 'connecting' | 'simulated' | 'disconnected'
+      // Bağlantı durumu: 'connected_gateway' | 'connected_mock' | 'waiting_gateway' | 'waiting_mock' | 'simulated'
       this.connectionStatus = 'simulated';
+      this.connectedUrl = null;
+      this.hasReceivedWsData = false;
+      this.wsDataWatchdog = null;
       this.activeFloorLevel = 1;
       this.autoTrafficInterval = null;
       this.ws = null;
@@ -441,19 +442,53 @@
           opened = true;
           this.ws = ws;
           this.connectedUrl = targetUrl;
-          this.connectionStatus = isGateway ? 'connected_gateway' : 'connected_mock';
+          this.hasReceivedWsData = false;
+          // Bağlantı kuruldu ama henüz yayın mesajı gelmedi -> "veri bekleniyor" durumu
+          this.connectionStatus = isGateway ? 'waiting_gateway' : 'waiting_mock';
           this.notifySubscribers({
             event: 'connection.change',
             status: this.connectionStatus,
             url: targetUrl,
             mode: isGateway ? 'Gerçek Gateway (8000)' : 'Mock Gateway (8100)',
+            waiting: true,
           });
+
+          // 10 saniye içinde mesaj gelmezse durumu teyit et
+          if (this.wsDataWatchdog) clearTimeout(this.wsDataWatchdog);
+          this.wsDataWatchdog = setTimeout(() => {
+            if (!this.hasReceivedWsData && this.ws === ws) {
+              this.connectionStatus = isGateway ? 'waiting_gateway' : 'waiting_mock';
+              this.notifySubscribers({
+                event: 'connection.change',
+                status: this.connectionStatus,
+                url: targetUrl,
+                mode: isGateway ? 'Gerçek Gateway (8000)' : 'Mock Gateway (8100)',
+                waiting: true,
+              });
+            }
+          }, 10000);
         };
 
         ws.onmessage = (ev) => {
           try {
             const msg = JSON.parse(ev.data);
             if (msg.event === 'lot.occupancy' && msg.data) {
+              // İlk mesaj geldiğinde rozeti canlı akış moduna geçir
+              if (!this.hasReceivedWsData) {
+                this.hasReceivedWsData = true;
+                if (this.wsDataWatchdog) {
+                  clearTimeout(this.wsDataWatchdog);
+                  this.wsDataWatchdog = null;
+                }
+                this.connectionStatus = isGateway ? 'connected_gateway' : 'connected_mock';
+                this.notifySubscribers({
+                  event: 'connection.change',
+                  status: this.connectionStatus,
+                  url: targetUrl,
+                  mode: isGateway ? 'Gerçek Gateway (8000)' : 'Mock Gateway (8100)',
+                  streaming: true,
+                });
+              }
               this.applyExternalOccupancy(msg.data);
               this.notifySubscribers({ event: 'external.occupancy', data: msg.data });
             }
@@ -463,6 +498,11 @@
         };
 
         ws.onclose = () => {
+          if (this.wsDataWatchdog) {
+            clearTimeout(this.wsDataWatchdog);
+            this.wsDataWatchdog = null;
+          }
+          this.hasReceivedWsData = false;
           if (!opened) {
             // Port kapalıysa bir sonraki adayı dene
             this.connectWebSocketCandidates(targets, index + 1);
@@ -494,7 +534,6 @@
 
     applyExternalOccupancy(data) {
       if (!data) return;
-      this.externalOccupancy = data;
       if (Array.isArray(data.by_floor)) {
         for (const extFloor of data.by_floor) {
           const localFloor = this.floors.find((f) => f.level === extFloor.level || f.id === extFloor.floor_id);

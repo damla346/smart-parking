@@ -185,6 +185,23 @@ body {
   background: #22c55e;
 }
 
+.status-badge.waiting {
+  background: #fefce8;
+  color: #854d0e;
+  border-color: #fef08a;
+}
+
+.status-badge.waiting .status-dot {
+  background: #eab308;
+  animation: pulseDot 1.5s infinite;
+}
+
+@keyframes pulseDot {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { opacity: 0.4; }
+}
+
 .simulation-toggle {
   display: flex;
   align-items: center;
