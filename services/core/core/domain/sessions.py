@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from contracts.schemas.events import (
@@ -30,10 +31,22 @@ from core.models import FloorRow, LotRow, SessionRow, SlotRow
 def oturum_ac(db: Session, plate: str, lot_id: int) -> OturumSemasi:
     """En alt kattaki ilk boş slotu atar ve açık oturum oluşturur.
 
-    Aynı plakanın ikinci açık oturumu henüz engellenmiyor (DECISIONS.md, mükerrer giriş).
+    Plakanın açık oturumu varsa — hangi otoparkta olursa olsun — giriş reddedilir;
+    mevcut oturuma dokunulmaz (DECISIONS.md, mükerrer giriş).
     """
+    # ANPR plakayı büyük harf ve boşluksuz üretir; "01 abc 123" kontrolü atlatmasın
+    plate = plate.replace(" ", "").upper()
+
     if db.get(LotRow, lot_id) is None:
         raise Bulunamadi(f"Otopark bulunamadı: {lot_id}")
+
+    acik = db.scalar(
+        select(SessionRow.id).where(
+            SessionRow.plate == plate, SessionRow.status == SessionStatus.OPEN
+        )
+    )
+    if acik is not None:
+        raise Cakisma(f"Plaka zaten içeride: {plate}")
 
     # skip_locked: aynı anda giren iki araç aynı slotu alamaz, ikincisi sıradakine geçer
     slot = db.scalar(
@@ -57,7 +70,12 @@ def oturum_ac(db: Session, plate: str, lot_id: int) -> OturumSemasi:
     )
     slot.status = SlotStatus.OCCUPIED.value
     db.add(oturum)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as hata:
+        # Yukarıdaki kontrolü aynı anda geçen ikinci istek index'e takılır
+        db.rollback()
+        raise Cakisma(f"Plaka zaten içeride: {plate}") from hata
 
     publisher.yayinla(
         CH_SESSION_STARTED,
