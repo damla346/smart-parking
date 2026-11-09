@@ -2,18 +2,29 @@
 
 Şartname: "plaka tanıma simülasyonu ile giriş-çıkış". Gerçek OCR kapsam dışı;
 ileride istenirse `oku()` içindeki strateji değiştirilir, dış yüzey aynı kalır.
-
-İSKELET — gerçek zamanlayıcı ve senaryo dağılımı Hafta 2'de doldurulacak.
 """
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
+import logging
 import random
 from datetime import datetime, timezone
 
 from contracts.schemas.session import PlateRead
 from gateway.anpr.plate_gen import rastgele_plaka
 from gateway.anpr.scenarios import VARSAYILAN_DAGILIM, ReadOutcome
+from gateway.flow.session_flow import (
+    AcikOturumBulunamadiHatasi,
+    BosSlotYokHatasi,
+    OkumaReddedildiHatasi,
+    acik_oturumlar,
+    cikis_akisi,
+    giris_akisi,
+)
+
+log = logging.getLogger(__name__)
 
 
 def oku(
@@ -51,3 +62,51 @@ def oku(
         ),
         sonuc,
     )
+
+
+async def adim_calistir(
+    lot_id: int = 1,
+    *,
+    rng: random.Random | None = None,
+) -> tuple[PlateRead, ReadOutcome]:
+    """Tek bir simülasyon adımı: içerideki araç durumuna göre giriş veya çıkış tetikler."""
+    r = rng or random
+    mevcut_aciklar = acik_oturumlar(lot_id=lot_id)
+
+    if mevcut_aciklar and r.random() < 0.4:
+        secilen = r.choice(mevcut_aciklar)
+        okuma, sonuc = oku(lot_id=lot_id, gate="exit", plaka=secilen.plate, rng=r)
+        with contextlib.suppress(OkumaReddedildiHatasi, AcikOturumBulunamadiHatasi):
+            await cikis_akisi(okuma)
+        return okuma, sonuc
+
+    okuma, sonuc = oku(lot_id=lot_id, gate="entry", rng=r)
+    if sonuc is ReadOutcome.DUPLICATE and mevcut_aciklar:
+        okuma.plate = r.choice(mevcut_aciklar).plate
+
+    with contextlib.suppress(OkumaReddedildiHatasi, BosSlotYokHatasi):
+        await giris_akisi(okuma)
+    return okuma, sonuc
+
+
+async def _dongu(lot_id: int, aralik_sn: float) -> None:
+    while True:
+        try:
+            await adim_calistir(lot_id=lot_id)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001
+            log.warning("ANPR simülasyon adımında beklenmeyen hata", exc_info=True)
+        await asyncio.sleep(aralik_sn)
+
+
+async def start(lot_id: int = 1, aralik_sn: float = 5.0) -> asyncio.Task[None]:
+    """Periyodik ANPR simülasyon zamanlayıcısını başlatır."""
+    return asyncio.create_task(_dongu(lot_id=lot_id, aralik_sn=aralik_sn))
+
+
+async def stop(task: asyncio.Task[None]) -> None:
+    """Periyodik ANPR simülasyon zamanlayıcısını durdurur."""
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
