@@ -6,42 +6,11 @@ TestClient üzerinden çağrılıyor. Redis yerine yayınlar listeye yazılıyor
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-
 import pytest
 from conftest import otopark_ekle, slot_bul
-from fastapi.testclient import TestClient
-from pydantic import BaseModel
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import Session
-from sqlalchemy.pool import StaticPool
+from sqlalchemy import select
 
-from core import publisher
-from core.db import Base, get_db
-from core.main import app
 from core.models import SessionRow, SlotRow
-
-
-@pytest.fixture
-def ortam(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, Session, list]]:
-    """StaticPool: uç başka iş parçacığında koşsa da aynı bellek içi DB görünsün."""
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    olaylar: list[tuple[str, BaseModel]] = []
-    monkeypatch.setattr(publisher, "yayinla", lambda kanal, olay: olaylar.append((kanal, olay)))
-
-    def test_db() -> Iterator[Session]:
-        with Session(engine, expire_on_commit=False) as oturum:
-            yield oturum
-
-    app.dependency_overrides[get_db] = test_db
-    with Session(engine, expire_on_commit=False) as db:
-        yield TestClient(app), db, olaylar
-    app.dependency_overrides.clear()
 
 
 def test_oturum_acilir_ve_slot_dolar(ortam) -> None:

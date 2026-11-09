@@ -15,13 +15,44 @@ from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from fastapi.testclient import TestClient
+from pydantic import BaseModel
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
 
-from core.db import Base
-from core.models import FloorRow, LotRow, SessionRow, SlotRow
+from core import publisher
+from core.db import Base, get_db
+from core.main import app
+from core.models import FloorRow, LotRow, SessionRow, SlotRow, TariffRuleRow
 
 SIMDI = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
+
+
+@pytest.fixture
+def ortam(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, Session, list]]:
+    """Uç testleri için: istemci, aynı DB'ye bakan oturum ve yayınlanan olaylar.
+
+    StaticPool: uç başka iş parçacığında koşsa da aynı bellek içi DB görünsün.
+    Redis yerine yayınlar listeye yazılır.
+    """
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    olaylar: list[tuple[str, BaseModel]] = []
+    monkeypatch.setattr(publisher, "yayinla", lambda kanal, olay: olaylar.append((kanal, olay)))
+
+    def test_db() -> Iterator[Session]:
+        with Session(engine, expire_on_commit=False) as oturum:
+            yield oturum
+
+    app.dependency_overrides[get_db] = test_db
+    with Session(engine, expire_on_commit=False) as db:
+        yield TestClient(app), db, olaylar
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -59,6 +90,17 @@ def otopark_ekle(db: Session, ad: str, kat_sayisi: int, kat_basi_slot: int) -> L
             )
     db.flush()
     return lot
+
+
+def tarife_ekle(db: Session, lot: LotRow) -> None:
+    """pricing.py'deki örnek tarife: 0-30 dk ücretsiz, 30-120 dk 50 kr/dk, 120+ 35 kr/dk."""
+    for baslangic, bitis, fiyat in [(0, 30, 0), (30, 120, 50), (120, None, 35)]:
+        db.add(
+            TariffRuleRow(
+                lot_id=lot.id, from_min=baslangic, to_min=bitis, price_per_min_cents=fiyat
+            )
+        )
+    db.flush()
 
 
 def slot_bul(db: Session, lot: LotRow, kod: str) -> SlotRow:
