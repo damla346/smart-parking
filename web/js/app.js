@@ -21,6 +21,7 @@
 
     initClock();
     initTabs();
+    initDashboardControls();
     initSimulationToggle();
     initFloorPlanControls();
     initAnprControls();
@@ -70,6 +71,19 @@
     }
     update();
     setInterval(update, 1000);
+  }
+
+  function initDashboardControls() {
+    const btnShuffle = document.getElementById('btn-shuffle-occupancy');
+    if (btnShuffle) {
+      btnShuffle.addEventListener('click', () => {
+        if (window.ParkingStore && typeof window.ParkingStore.resetSimulationState === 'function') {
+          window.ParkingStore.resetSimulationState();
+          const occ = window.ParkingStore.getOccupancy();
+          showToast(`Otopark yeni bir rastgele dağılımla yenilendi: ${occ.occupied} Dolu (%${occ.occupancy_percent})`, 'info');
+        }
+      });
+    }
   }
 
   function initSimulationToggle() {

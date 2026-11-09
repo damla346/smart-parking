@@ -105,13 +105,26 @@
       let sessionId = 100;
       const allSlots = this.getAllSlots();
 
-      // Belirli slotları başlangıçta doldur
-      allSlots.forEach((slot, index) => {
-        // %68 doluluk oranı elde edecek şekilde dağıt
-        const shouldOccupy = (index % 3 !== 0) || (index % 7 === 0);
-        if (shouldOccupy && index < 90) {
-          const plaka = index < ornekPlakalar.length ? ornekPlakalar[index] : window.ANPR.rastgelePlaka();
-          // 15 dk ile 360 dk arası rastgele giriş zamanı
+      // Önceki durumu temizle
+      allSlots.forEach((s) => {
+        s.status = 'free';
+        s.plate = null;
+        s.entry_at = null;
+      });
+      this.sessions = [];
+
+      // Her açılışta %48 ile %82 arasında rastgele, doğal bir doluluk oranı üret
+      const hedefOran = 0.48 + Math.random() * 0.34;
+      const hedefDoluSayisi = Math.round(allSlots.length * hedefOran);
+
+      // Slotları rastgele karıştır ve rastgele hedef kadarını doldur
+      const karisikSlotlar = [...allSlots].sort(() => Math.random() - 0.5);
+
+      for (let i = 0; i < karisikSlotlar.length; i++) {
+        const slot = karisikSlotlar[i];
+        if (i < hedefDoluSayisi) {
+          const plaka = i < ornekPlakalar.length ? ornekPlakalar[i] : window.ANPR.rastgelePlaka();
+          // 12 dk ile 340 dk arası rastgele giriş zamanı
           const gecenDakika = Math.floor(Math.random() * 320) + 12;
           const girisZamani = new Date(simdi.getTime() - gecenDakika * 60 * 1000).toISOString();
 
@@ -132,7 +145,7 @@
             status: 'open',
           });
         }
-      });
+      }
 
       // Birkaç tane de geçmişte tamamlanmış oturum ekle (log ekranı için)
       for (let i = 0; i < 8; i++) {
@@ -155,6 +168,14 @@
           status: 'closed',
         });
       }
+    }
+
+    /**
+     * Otopark durumunu rastgele yeni bir doluluk oranıyla sıfırlar/yeniler
+     */
+    resetSimulationState() {
+      this.initInitialVehicles();
+      this.notifySubscribers({ event: 'state.reset' });
     }
 
     getAllSlots() {
