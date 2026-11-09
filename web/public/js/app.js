@@ -79,10 +79,11 @@
 
     toggleBtn.addEventListener('click', () => {
       const isActive = toggleSwitch.classList.toggle('active');
+      toggleBtn.classList.toggle('active', isActive);
       const running = window.ParkingStore.toggleAutoTraffic(isActive);
 
       if (running) {
-        showToast('Canlı trafik simülasyonu başlatıldı (5 sn periyot)', 'info');
+        showToast('Canlı trafik simülasyonu başlatıldı (Her 3 sn araç akışı)', 'info');
       } else {
         showToast('Trafik simülasyonu durduruldu', 'info');
       }
@@ -287,7 +288,7 @@
     }
 
     return `
-      <div class="slot-bay status-${slot.status}" onclick="window.App.openSlotModal('${slot.code}')">
+      <div id="slot-card-${slot.code}" data-slot-code="${slot.code}" class="slot-bay status-${slot.status}" onclick="window.App.openSlotModal('${slot.code}')">
         <div class="slot-top-row">
           <span class="slot-code">${slot.code}</span>
           <span class="slot-type-icon ${typeClass}" title="${slot.type.toUpperCase()}">${typeIcon}</span>
@@ -335,8 +336,8 @@
     if (btnRandomEntry) {
       btnRandomEntry.addEventListener('click', () => {
         try {
-          flashCameraTarget('success');
           const result = window.ParkingStore.simulateRandomEntry();
+          updateCameraPreview(result.slot.plate, 'entry', result.slot.code);
           showToast(`Plaka Tanındı: ${window.ANPR.formatPlaka(result.slot.plate)} ➔ Slot: ${result.slot.code}`, 'success');
         } catch (err) {
           showToast(err.message, 'danger');
@@ -348,8 +349,8 @@
     if (btnRandomExit) {
       btnRandomExit.addEventListener('click', () => {
         try {
-          flashCameraTarget('danger');
           const breakdown = window.ParkingStore.simulateRandomExit();
+          updateCameraPreview(breakdown.plate, 'exit', breakdown.slot_code);
           openReceiptModal(breakdown);
         } catch (err) {
           showToast(err.message, 'danger');
@@ -366,9 +367,9 @@
           return;
         }
         try {
-          flashCameraTarget('success');
           const result = window.ParkingStore.vehicleEntry(plaka);
           inputPlate.value = '';
+          updateCameraPreview(result.slot.plate, 'entry', result.slot.code);
           showToast(`Giriş Başarılı: ${window.ANPR.formatPlaka(result.slot.plate)} ➔ Slot: ${result.slot.code}`, 'success');
         } catch (err) {
           showToast(err.message, 'danger');
@@ -385,9 +386,9 @@
           return;
         }
         try {
-          flashCameraTarget('danger');
           const breakdown = window.ParkingStore.vehicleExit(plaka);
           inputPlate.value = '';
+          updateCameraPreview(breakdown.plate, 'exit', breakdown.slot_code);
           openReceiptModal(breakdown);
         } catch (err) {
           showToast(err.message, 'danger');
@@ -398,7 +399,7 @@
     // Hata Senaryosu (Okunamayan Plaka)
     if (btnSimulateError) {
       btnSimulateError.addEventListener('click', () => {
-        flashCameraTarget('error');
+        updateCameraPreview('?? *** ??', 'error', '—', 0.28);
         window.ParkingStore.addCameraLog({
           type: 'error',
           plate: '?? *** ??',
@@ -413,14 +414,39 @@
     }
   }
 
+  function updateCameraPreview(plate, statusType = 'entry', slotCode = '', confidence = null) {
+    const platePreview = document.getElementById('anpr-plate-preview');
+    if (platePreview && plate) {
+      platePreview.innerHTML = window.ANPR.renderPlateBadge(plate, { size: 'lg' });
+    }
+    const hudStatus = document.querySelector('.hud-overlay-status');
+    if (hudStatus) {
+      const confVal = confidence ? Math.round(confidence * 100) : (94 + Math.floor(Math.random() * 6));
+      const actionText = statusType === 'entry' ? 'GİRİŞ ONAYLANDI' : statusType === 'exit' ? 'ÇIKIŞ ONAYLANDI' : 'HATA: OKUNAMADI';
+      const color = statusType === 'entry' ? '#10b981' : statusType === 'exit' ? '#3b82f6' : '#ef4444';
+      hudStatus.innerHTML = `
+        GÜVEN: %${confVal}<br>
+        DURUM: <span style="color:${color}; font-weight:700;">${actionText}</span>
+        ${slotCode ? `<br>SLOT: <strong style="color:#f43f5e;">${slotCode}</strong>` : ''}
+      `;
+    }
+    flashCameraTarget(statusType === 'error' ? 'error' : 'success');
+  }
+
   function flashCameraTarget(type) {
     const target = document.querySelector('.viewfinder-target');
     if (!target) return;
     target.style.transition = 'all 0.15s ease';
     target.style.transform = 'scale(1.05)';
+    if (type === 'error') {
+      target.style.borderColor = '#ef4444';
+    } else {
+      target.style.borderColor = '#10b981';
+    }
     setTimeout(() => {
       target.style.transform = 'scale(1)';
-    }, 250);
+      target.style.borderColor = '';
+    }, 280);
   }
 
   function renderAnprLogTable() {
@@ -842,8 +868,25 @@ function showToast(message, type = 'info') {
 function handleStoreUpdate(payload) {
   if (payload && payload.event === 'connection.change') {
     updateConnectionBadge(payload);
+  } else if (payload && payload.event === 'slot.occupied') {
+    if (payload.data && payload.data.plate) {
+      updateCameraPreview(payload.data.plate, 'entry', payload.data.slot_code);
+    }
+  } else if (payload && payload.event === 'slot.freed') {
+    if (payload.data && payload.data.plate) {
+      updateCameraPreview(payload.data.plate, 'exit', payload.data.slot_code);
+    }
   }
   renderAll();
+
+  // Değişen slotu görsel olarak vurgula
+  if (payload && payload.data && payload.data.slot_code) {
+    const el = document.getElementById(`slot-card-${payload.data.slot_code}`);
+    if (el) {
+      el.classList.add('slot-just-updated');
+      setTimeout(() => el.classList.remove('slot-just-updated'), 1200);
+    }
+  }
 }
 
 function updateConnectionBadge(payload) {

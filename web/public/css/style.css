@@ -250,6 +250,18 @@ body {
   transform: translateX(12px);
 }
 
+.simulation-toggle.active {
+  background: #ffe4e6;
+  border-color: #fda4af;
+  color: #e11d48;
+}
+
+.simulation-toggle.active span::before {
+  content: "● ";
+  color: #e11d48;
+  animation: pulseDot 1s infinite;
+}
+
 /* Nav Tabs */
 .header-nav {
   display: flex;
@@ -718,6 +730,25 @@ body {
   transform: translateY(-2px);
   border-color: #f43f5e;
   box-shadow: var(--shadow-md);
+}
+
+.slot-bay.slot-just-updated {
+  animation: slotPulse 1.2s ease-out;
+}
+
+@keyframes slotPulse {
+  0% {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 5px rgba(244, 63, 94, 0.45);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.25);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: none;
+  }
 }
 
 .slot-bay.status-free {

@@ -196,28 +196,38 @@
     }
 
     /**
-     * Boş bir slot bulur (tercihen girilen tipe ve en alt kata göre)
+     * Boş bir slot bulur. Katlar arasında ve slotlar içinde dengeli ve gerçekçi dağıtım yapar.
      */
     findAvailableSlot(preferredType = null, floorLevel = null) {
-      let targetFloors = this.floors;
+      // 1. Belirli bir kat istenmişse sadece o kata bak
       if (floorLevel) {
-        targetFloors = this.floors.filter((f) => f.level === floorLevel);
+        const floor = this.floors.find((f) => f.level === floorLevel);
+        if (floor) {
+          const freeSlots = floor.slots.filter((s) => s.status === 'free');
+          if (freeSlots.length > 0) {
+            if (preferredType) {
+              const typed = freeSlots.filter((s) => s.type === preferredType);
+              if (typed.length > 0) return typed[Math.floor(Math.random() * typed.length)];
+            }
+            return freeSlots[Math.floor(Math.random() * freeSlots.length)];
+          }
+        }
+        return null;
       }
 
-      for (const floor of targetFloors) {
-        // Önce tam eşleşen tip
-        if (preferredType) {
-          const slot = floor.slots.find((s) => s.status === 'free' && s.type === preferredType);
-          if (slot) return slot;
+      // 2. Kat belirtilmemişse: Tüm katlardaki boş slotları topla
+      const allFreeSlots = this.getAllSlots().filter((s) => s.status === 'free');
+      if (allFreeSlots.length === 0) return null;
+
+      if (preferredType) {
+        const typedSlots = allFreeSlots.filter((s) => s.type === preferredType);
+        if (typedSlots.length > 0) {
+          return typedSlots[Math.floor(Math.random() * typedSlots.length)];
         }
-        // Yoksa herhangi bir boş standart slot
-        const standardSlot = floor.slots.find((s) => s.status === 'free' && s.type === 'standard');
-        if (standardSlot) return standardSlot;
-        // Son çare herhangi bir boş slot
-        const anySlot = floor.slots.find((s) => s.status === 'free');
-        if (anySlot) return anySlot;
       }
-      return null;
+
+      // 1., 2. ve 3. katlara rastgele ve gerçekçi dağıt
+      return allFreeSlots[Math.floor(Math.random() * allFreeSlots.length)];
     }
 
     /**
@@ -394,7 +404,7 @@
           } catch (e) {
             console.warn('Otomatik simülasyon adımı atlandı:', e.message);
           }
-        }, 5500);
+        }, 3200);
       }
       return !!this.autoTrafficInterval;
     }
@@ -548,18 +558,24 @@
             const diff = extFloor.occupied - currentOccupied;
             if (diff > 0) {
               const freeSlots = localFloor.slots.filter((s) => s.status === 'free');
-              for (let i = 0; i < Math.min(diff, freeSlots.length); i++) {
-                freeSlots[i].status = 'occupied';
+              const count = Math.min(diff, freeSlots.length);
+              for (let i = 0; i < count; i++) {
+                const randIdx = Math.floor(Math.random() * freeSlots.length);
+                const pickedSlot = freeSlots.splice(randIdx, 1)[0];
+                pickedSlot.status = 'occupied';
                 // Yerel tahminleme: Gateway'den münferit plaka gelene kadar slot doluluk illüzyonunu korur
-                freeSlots[i].plate = window.ANPR.rastgelePlaka();
-                freeSlots[i].entry_at = new Date().toISOString();
+                pickedSlot.plate = window.ANPR.rastgelePlaka();
+                pickedSlot.entry_at = new Date().toISOString();
               }
             } else if (diff < 0) {
               const occSlots = localFloor.slots.filter((s) => s.status === 'occupied');
-              for (let i = 0; i < Math.min(Math.abs(diff), occSlots.length); i++) {
-                occSlots[i].status = 'free';
-                occSlots[i].plate = null;
-                occSlots[i].entry_at = null;
+              const count = Math.min(Math.abs(diff), occSlots.length);
+              for (let i = 0; i < count; i++) {
+                const randIdx = Math.floor(Math.random() * occSlots.length);
+                const pickedSlot = occSlots.splice(randIdx, 1)[0];
+                pickedSlot.status = 'free';
+                pickedSlot.plate = null;
+                pickedSlot.entry_at = null;
               }
             }
           }
