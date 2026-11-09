@@ -532,6 +532,12 @@
       }
     }
 
+    /**
+     * Canlı Gateway/Mock sayaç verisini (lot.occupancy) yerel arayüze uygular.
+     * NOT: lot.occupancy bir sayaç olayıdır ve plaka bilgisi taşımaz. Aşağıdaki plaka üretimi,
+     * arayüzdeki kat slot görselleştirmesini ve sayaçları beslemek için yapılan yerel bir tahminlemedir;
+     * Gateway doğrudan bireysel vehicle.entry/vehicle.exit olayları yayınlamaya başladığında kaldırılacaktır.
+     */
     applyExternalOccupancy(data) {
       if (!data) return;
       if (Array.isArray(data.by_floor)) {
@@ -544,6 +550,7 @@
               const freeSlots = localFloor.slots.filter((s) => s.status === 'free');
               for (let i = 0; i < Math.min(diff, freeSlots.length); i++) {
                 freeSlots[i].status = 'occupied';
+                // Yerel tahminleme: Gateway'den münferit plaka gelene kadar slot doluluk illüzyonunu korur
                 freeSlots[i].plate = window.ANPR.rastgelePlaka();
                 freeSlots[i].entry_at = new Date().toISOString();
               }

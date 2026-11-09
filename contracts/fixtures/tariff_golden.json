@@ -1,0 +1,12 @@
+[
+  { "duration_min": 0, "expected_cents": 0, "description": "0 dakika: araç hemen çıktı / hiç kalmadı" },
+  { "duration_min": 1, "expected_cents": 0, "description": "1 dakika: ilk kademe ücretsiz (0-30 dk)" },
+  { "duration_min": 29, "expected_cents": 0, "description": "29 dakika: ilk kademe dolmadan çıkış" },
+  { "duration_min": 30, "expected_cents": 0, "description": "30 dakika: tam sınırda çıkış, ücret 0" },
+  { "duration_min": 31, "expected_cents": 50, "description": "31 dakika: 30 dk ötesi 1 dk x 50 kr" },
+  { "duration_min": 94, "expected_cents": 3200, "description": "94 dakika: (94 - 30) x 50 kr = 3200 kr" },
+  { "duration_min": 120, "expected_cents": 4500, "description": "120 dakika: ikinci kademe tam dolu 90 x 50 kr = 4500 kr" },
+  { "duration_min": 121, "expected_cents": 4535, "description": "121 dakika: 4500 + 1 x 35 kr" },
+  { "duration_min": 480, "expected_cents": 17100, "description": "480 dakika: 4500 + 360 x 35 kr = 17100 kr" },
+  { "duration_min": 600, "expected_cents": 19500, "description": "600 dakika: 17100 + 120 x 20 kr = 19500 kr (açık uçlu son kademe)" }
+]
