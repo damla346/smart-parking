@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/test_tariff_golden.mjs",
+    "test:golden": "node scripts/test_tariff_golden.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
