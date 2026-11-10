@@ -39,5 +39,5 @@ test:
 lint:
 	ruff check services/ infra/ contracts/
 
-seed:              ## demo verisi (havuz görevi #1)
-	python infra/seed/seed_data.py
+seed:              ## demo verisi; dolu DB'yi silmek için: make seed ARGS=--sifirla
+	PYTHONPATH=.:services/core python infra/seed/seed_data.py $(ARGS)
