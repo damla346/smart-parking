@@ -1,0 +1,82 @@
+# Sahip: Berat (YOL_HARITASI.md §4, §10 · CODEOWNERS)
+# Üretim / teslim ortamı: altyapı (postgres + redis) ve üç servisi (core, gateway, web) birleştirir.
+# Yönlü kurallar (§2):
+#   - core dışarıya port açmaz (yalnızca Docker ağı içi :8001)
+#   - gateway dışa bakan TEK backend servisidir (:8000) ve DB'ye bağlanmaz
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sp_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-parking}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-parking}
+      POSTGRES_DB: ${POSTGRES_DB:-parking}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-parking}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: sp_redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  core:
+    build:
+      context: .
+      dockerfile: services/core/Dockerfile
+    container_name: sp_core
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-parking}:${POSTGRES_PASSWORD:-parking}@postgres:5432/${POSTGRES_DB:-parking}
+      REDIS_URL: redis://redis:6379/0
+    expose:
+      - "8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    container_name: sp_gateway
+    environment:
+      USE_MOCK: "false"
+      CORE_URL: http://core:8001
+      REDIS_URL: redis://redis:6379/0
+      GATEWAY_PORT: "8000"
+    ports:
+      - "${GATEWAY_PORT:-8000}:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      core:
+        condition: service_started
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: sp_web
+    environment:
+      VITE_USE_MOCK: "false"
+      VITE_API_URL: http://localhost:${GATEWAY_PORT:-8000}
+      VITE_WS_URL: ws://localhost:${GATEWAY_PORT:-8000}/ws/occupancy
+    ports:
+      - "${WEB_PORT:-5173}:80"
+    depends_on:
+      - gateway
+
+volumes:
+  pgdata:

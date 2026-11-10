@@ -339,3 +339,31 @@ async def test_simulator_adim_ve_zamanlayici() -> None:
 
         gorev = await simulator.start(lot_id=1, aralik_sn=0.02)
         await simulator.stop(gorev)
+
+
+def test_rest_lots_ve_tariffs_proxy_uclari() -> None:
+    with (
+        patch("gateway.ws.bridge.start", new=AsyncMock()),
+        patch("gateway.ws.bridge.stop", new=AsyncMock()),
+        patch(
+            "gateway.api.lots.core.lots",
+            new=AsyncMock(return_value=[{"id": 1, "name": "Merkez", "total_slots": 120}]),
+        ),
+        patch(
+            "gateway.api.lots.core.occupancy",
+            new=AsyncMock(return_value={"lot_id": 1, "total": 120, "occupied": 80, "free": 40}),
+        ),
+        patch(
+            "gateway.api.lots.core.floors",
+            new=AsyncMock(return_value=_ornek_katlar(bos_var=True)),
+        ),
+        patch(
+            "gateway.api.tariffs.core.tariffs",
+            new=AsyncMock(return_value=[{"id": 1, "lot_id": 1, "from_min": 0, "to_min": 30}]),
+        ),
+        TestClient(app) as client,
+    ):
+        assert client.get("/lots").status_code == 200
+        assert client.get("/lots/1/occupancy").status_code == 200
+        assert client.get("/lots/1/floors").status_code == 200
+        assert client.get("/tariffs", params={"lot_id": 1}).status_code == 200
