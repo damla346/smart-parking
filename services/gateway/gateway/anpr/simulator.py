@@ -12,16 +12,17 @@ import logging
 import random
 from datetime import datetime, timezone
 
+import httpx
+
 from contracts.schemas.session import PlateRead
 from gateway.anpr.plate_gen import rastgele_plaka
 from gateway.anpr.scenarios import VARSAYILAN_DAGILIM, ReadOutcome
 from gateway.flow.session_flow import (
     AcikOturumBulunamadiHatasi,
-    BosSlotYokHatasi,
     OkumaReddedildiHatasi,
-    acik_oturumlar,
     cikis_akisi,
     giris_akisi,
+    icerideki_plakalar,
 )
 
 log = logging.getLogger(__name__)
@@ -71,20 +72,22 @@ async def adim_calistir(
 ) -> tuple[PlateRead, ReadOutcome]:
     """Tek bir simülasyon adımı: içerideki araç durumuna göre giriş veya çıkış tetikler."""
     r = rng or random
-    mevcut_aciklar = acik_oturumlar(lot_id=lot_id)
+    mevcut_plakalar = await icerideki_plakalar(lot_id=lot_id)
 
-    if mevcut_aciklar and r.random() < 0.4:
-        secilen = r.choice(mevcut_aciklar)
-        okuma, sonuc = oku(lot_id=lot_id, gate="exit", plaka=secilen.plate, rng=r)
-        with contextlib.suppress(OkumaReddedildiHatasi, AcikOturumBulunamadiHatasi):
+    if mevcut_plakalar and r.random() < 0.4:
+        secilen_plaka = r.choice(mevcut_plakalar)
+        okuma, sonuc = oku(lot_id=lot_id, gate="exit", plaka=secilen_plaka, rng=r)
+        with contextlib.suppress(
+            OkumaReddedildiHatasi, AcikOturumBulunamadiHatasi, httpx.HTTPError
+        ):
             await cikis_akisi(okuma)
         return okuma, sonuc
 
     okuma, sonuc = oku(lot_id=lot_id, gate="entry", rng=r)
-    if sonuc is ReadOutcome.DUPLICATE and mevcut_aciklar:
-        okuma.plate = r.choice(mevcut_aciklar).plate
+    if sonuc is ReadOutcome.DUPLICATE and mevcut_plakalar:
+        okuma.plate = r.choice(mevcut_plakalar)
 
-    with contextlib.suppress(OkumaReddedildiHatasi, BosSlotYokHatasi):
+    with contextlib.suppress(OkumaReddedildiHatasi, httpx.HTTPError):
         await giris_akisi(okuma)
     return okuma, sonuc
 

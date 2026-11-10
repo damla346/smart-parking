@@ -43,6 +43,10 @@ class CoreClient:
     async def tariffs(self, lot_id: int) -> Any:
         return await self._get("/tariffs", lot_id=lot_id)
 
+    async def entry(self, plate: str, lot_id: int) -> Any:
+        """Yeni oturum açar; boş slot ataması, DB kaydı ve Redis olayları core'dadır."""
+        return await self._post("/sessions", plate=plate, lot_id=lot_id)
+
     async def sessions(
         self,
         *,
