@@ -1,4 +1,4 @@
-"""Giriş oturumu açma. Sahip: Damla.
+"""Giriş oturumu açma ve kayıt listesi. Sahip: Damla.
 
 Oturum ve slotun dolması tek commit'te olur: arada kopma "oturum var ama slot boş"
 bırakmamalı. Olaylar commit'ten SONRA yayınlanır.
@@ -28,14 +28,64 @@ from core.domain.occupancy import doluluk_ozeti
 from core.models import FloorRow, LotRow, SessionRow, SlotRow
 
 
+def plaka_duzelt(plate: str) -> str:
+    """ANPR plakayı büyük harf ve boşluksuz üretir; elle girilen "01 abc 123" de öyle olsun."""
+    return plate.replace(" ", "").upper()
+
+
+def oturum_listesi(
+    db: Session,
+    *,
+    plate: str | None = None,
+    lot_id: int | None = None,
+    baslangic: datetime | None = None,
+    bitis: datetime | None = None,
+    limit: int = 50,
+) -> list[OturumSemasi]:
+    """Giriş-çıkış kayıtları, en yeni giriş başta (SessionLog ekranı, openapi.yaml /sessions).
+
+    Tarih aralığı giriş saatine uygulanır. Plakanın açık oturumu en fazla bir tane
+    olduğundan gateway çıkışta `plate` ile sorgulayıp ilk kaydı alabilir.
+    """
+    stmt = (
+        select(SessionRow, SlotRow.code)
+        .join(SlotRow, SessionRow.slot_id == SlotRow.id)
+        .order_by(SessionRow.entry_at.desc(), SessionRow.id.desc())
+        .limit(limit)
+    )
+    if plate is not None:
+        stmt = stmt.where(SessionRow.plate == plaka_duzelt(plate))
+    if lot_id is not None:
+        stmt = stmt.where(SessionRow.lot_id == lot_id)
+    if baslangic is not None:
+        stmt = stmt.where(SessionRow.entry_at >= baslangic)
+    if bitis is not None:
+        stmt = stmt.where(SessionRow.entry_at < bitis)
+
+    return [
+        OturumSemasi(
+            id=oturum.id,
+            plate=oturum.plate,
+            lot_id=oturum.lot_id,
+            slot_id=oturum.slot_id,
+            slot_code=kod,
+            entry_at=oturum.entry_at,
+            exit_at=oturum.exit_at,
+            duration_min=oturum.duration_min,
+            fee_cents=oturum.fee_cents,
+            status=oturum.status,
+        )
+        for oturum, kod in db.execute(stmt)
+    ]
+
+
 def oturum_ac(db: Session, plate: str, lot_id: int) -> OturumSemasi:
     """En alt kattaki ilk boş slotu atar ve açık oturum oluşturur.
 
     Plakanın açık oturumu varsa — hangi otoparkta olursa olsun — giriş reddedilir;
     mevcut oturuma dokunulmaz (DECISIONS.md, mükerrer giriş).
     """
-    # ANPR plakayı büyük harf ve boşluksuz üretir; "01 abc 123" kontrolü atlatmasın
-    plate = plate.replace(" ", "").upper()
+    plate = plaka_duzelt(plate)
 
     if db.get(LotRow, lot_id) is None:
         raise Bulunamadi(f"Otopark bulunamadı: {lot_id}")
