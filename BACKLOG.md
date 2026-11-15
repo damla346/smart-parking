@@ -13,7 +13,7 @@ Denge tahminle değil akışla sağlanır — gerekçe: YOL_HARITASI.md §11.
 
 | # | Görev | Gün | Kimler alabilir | Alan | Durum |
 |--:|---|--:|---|---|---|
-| 1 | `infra/seed/seed_data.py` + demo verisi | 2 | Damla · Berat | — | açık |
+| 1 | `infra/seed/seed_data.py` + demo verisi | 2 | Damla · Berat | Damla | PR'da |
 | 2 | `tests/e2e/test_full_flow.py` uçtan uca senaryo | 2 | Berat · Damla | — | açık |
 | 3 | Rapor sorguları (`core/reports.py`) | 2 | Damla · Berat | — | açık |
 | 4 | `web/` rapor ekranı (tarife ekranı PR #6'da geldi) | 2 | Esra · Berat | — | açık |
