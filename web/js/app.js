@@ -130,8 +130,18 @@
     });
 
     // Sekmeye özel tazelemeler
-    if (tabId === 'floorplan') renderFloorPlan();
-    if (tabId === 'sessions') renderSessionsTable();
+    if (tabId === 'floorplan') {
+      if (window.ParkingStore && typeof window.ParkingStore.fetchFloors === 'function' && window.ParkingStore.isConnected()) {
+        window.ParkingStore.fetchFloors();
+      }
+      renderFloorPlan();
+    }
+    if (tabId === 'sessions') {
+      if (window.ParkingStore && typeof window.ParkingStore.fetchSessions === 'function') {
+        window.ParkingStore.fetchSessions({ plate: sessionSearchQuery });
+      }
+      renderSessionsTable();
+    }
     if (tabId === 'tariffs') updateTariffSimulation();
   }
 
@@ -296,9 +306,13 @@
 
     // Geçen süre
     let timeText = 'Müsait';
-    if (isOccupied && slot.entry_at) {
-      const minutes = window.TariffEngine.sureDakika(slot.entry_at, new Date());
-      timeText = window.TariffEngine.formatSure(minutes);
+    if (isOccupied) {
+      if (slot.entry_at) {
+        const minutes = window.TariffEngine.sureDakika(slot.entry_at, new Date());
+        timeText = window.TariffEngine.formatSure(minutes);
+      } else {
+        timeText = 'Park Halinde';
+      }
     }
 
     return `
@@ -348,64 +362,76 @@
 
     // Rastgele Giriş
     if (btnRandomEntry) {
-      btnRandomEntry.addEventListener('click', () => {
+      btnRandomEntry.addEventListener('click', async () => {
         try {
-          const result = window.ParkingStore.simulateRandomEntry();
+          btnRandomEntry.disabled = true;
+          const result = await window.ParkingStore.simulateRandomEntry();
           updateCameraPreview(result.slot.plate, 'entry', result.slot.code);
           showToast(`Plaka Tanındı: ${window.ANPR.formatPlaka(result.slot.plate)} ➔ Slot: ${result.slot.code}`, 'success');
         } catch (err) {
           showToast(err.message, 'danger');
+        } finally {
+          btnRandomEntry.disabled = false;
         }
       });
     }
 
     // Rastgele Çıkış
     if (btnRandomExit) {
-      btnRandomExit.addEventListener('click', () => {
+      btnRandomExit.addEventListener('click', async () => {
         try {
-          const breakdown = window.ParkingStore.simulateRandomExit();
+          btnRandomExit.disabled = true;
+          const breakdown = await window.ParkingStore.simulateRandomExit();
           updateCameraPreview(breakdown.plate, 'exit', breakdown.slot_code);
           openReceiptModal(breakdown);
         } catch (err) {
           showToast(err.message, 'danger');
+        } finally {
+          btnRandomExit.disabled = false;
         }
       });
     }
 
-    // Manuel Giriş
+    // Manuel Giriş (REST POST /entry)
     if (btnManualEntry && inputPlate) {
-      btnManualEntry.addEventListener('click', () => {
+      btnManualEntry.addEventListener('click', async () => {
         const plaka = inputPlate.value.trim();
         if (!plaka) {
           showToast('Lütfen önce bir plaka yazın!', 'danger');
           return;
         }
         try {
-          const result = window.ParkingStore.vehicleEntry(plaka);
+          btnManualEntry.disabled = true;
+          const result = await window.ParkingStore.vehicleEntry(plaka);
           inputPlate.value = '';
           updateCameraPreview(result.slot.plate, 'entry', result.slot.code);
           showToast(`Giriş Başarılı: ${window.ANPR.formatPlaka(result.slot.plate)} ➔ Slot: ${result.slot.code}`, 'success');
         } catch (err) {
           showToast(err.message, 'danger');
+        } finally {
+          btnManualEntry.disabled = false;
         }
       });
     }
 
-    // Manuel Çıkış
+    // Manuel Çıkış (REST POST /exit)
     if (btnManualExit && inputPlate) {
-      btnManualExit.addEventListener('click', () => {
+      btnManualExit.addEventListener('click', async () => {
         const plaka = inputPlate.value.trim();
         if (!plaka) {
           showToast('Lütfen önce bir plaka yazın!', 'danger');
           return;
         }
         try {
-          const breakdown = window.ParkingStore.vehicleExit(plaka);
+          btnManualExit.disabled = true;
+          const breakdown = await window.ParkingStore.vehicleExit(plaka);
           inputPlate.value = '';
           updateCameraPreview(breakdown.plate, 'exit', breakdown.slot_code);
           openReceiptModal(breakdown);
         } catch (err) {
           showToast(err.message, 'danger');
+        } finally {
+          btnManualExit.disabled = false;
         }
       });
     }
@@ -613,28 +639,35 @@
      ========================================================================== */
 
   function initSessionsControls() {
-  const searchInput = document.getElementById('session-search-input');
-  const statusSelect = document.getElementById('session-status-filter');
-  const exportBtn = document.getElementById('btn-export-csv');
+    const searchInput = document.getElementById('session-search-input');
+    const statusSelect = document.getElementById('session-status-filter');
+    const exportBtn = document.getElementById('btn-export-csv');
 
-  if (searchInput) {
-    searchInput.addEventListener('input', (e) => {
-      sessionSearchQuery = e.target.value.trim().toUpperCase();
-      renderSessionsTable();
-    });
-  }
+    let searchDebounceTimer = null;
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        sessionSearchQuery = e.target.value.trim().toUpperCase();
+        renderSessionsTable();
+        if (window.ParkingStore && typeof window.ParkingStore.fetchSessions === 'function' && window.ParkingStore.isConnected()) {
+          if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+          searchDebounceTimer = setTimeout(() => {
+            window.ParkingStore.fetchSessions({ plate: sessionSearchQuery });
+          }, 350);
+        }
+      });
+    }
 
-  if (statusSelect) {
-    statusSelect.addEventListener('change', (e) => {
-      sessionStatusFilter = e.target.value;
-      renderSessionsTable();
-    });
-  }
+    if (statusSelect) {
+      statusSelect.addEventListener('change', (e) => {
+        sessionStatusFilter = e.target.value;
+        renderSessionsTable();
+      });
+    }
 
-  if (exportBtn) {
-    exportBtn.addEventListener('click', exportSessionsCsv);
+    if (exportBtn) {
+      exportBtn.addEventListener('click', exportSessionsCsv);
+    }
   }
-}
 
 function renderSessionsTable() {
   const tbody = document.getElementById('sessions-table-body');
@@ -887,9 +920,11 @@ function handleStoreUpdate(payload) {
       updateCameraPreview(payload.data.plate, 'entry', payload.data.slot_code);
     }
   } else if (payload && payload.event === 'slot.freed') {
-    if (payload.data && payload.data.plate) {
-      updateCameraPreview(payload.data.plate, 'exit', payload.data.slot_code);
+    if (payload.data) {
+      updateCameraPreview(payload.data.plate || '—', 'exit', payload.data.slot_code);
     }
+  } else if (payload && payload.event === 'anpr.read_failed') {
+    updateCameraPreview('?? *** ??', 'error', '—', 0.28);
   }
   renderAll();
 
@@ -960,32 +995,32 @@ window.App = {
     openSlotModal(code);
   },
 
-  exitSlotVehicle(plate) {
+  async exitSlotVehicle(plate) {
     document.getElementById('slot-detail-modal').classList.remove('open');
     try {
-      const breakdown = window.ParkingStore.vehicleExit(plate);
+      const breakdown = await window.ParkingStore.vehicleExit(plate);
       openReceiptModal(breakdown);
     } catch (err) {
       showToast(err.message, 'danger');
     }
   },
 
-  parkVehicleToSlot(slotCode) {
+  async parkVehicleToSlot(slotCode) {
     const input = document.getElementById('slot-modal-plate-input');
     const plate = input ? input.value.trim() : '';
     document.getElementById('slot-detail-modal').classList.remove('open');
 
     try {
-      const result = window.ParkingStore.vehicleEntry(plate, { slotCode: slotCode });
-      showToast(`Araç başarıyla park edildi: ${window.ANPR.formatPlaka(result.slot.plate)}`, 'success');
+      const result = await window.ParkingStore.vehicleEntry(plate, { slotCode: slotCode });
+      showToast(`Araç girişi yapıldı: ${window.ANPR.formatPlaka(result.slot.plate)} ➔ Slot: ${result.slot.code}`, 'success');
     } catch (err) {
       showToast(err.message, 'danger');
     }
   },
 
-  exitSessionPlate(plate) {
+  async exitSessionPlate(plate) {
     try {
-      const breakdown = window.ParkingStore.vehicleExit(plate);
+      const breakdown = await window.ParkingStore.vehicleExit(plate);
       openReceiptModal(breakdown);
     } catch (err) {
       showToast(err.message, 'danger');

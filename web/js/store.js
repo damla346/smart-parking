@@ -1,7 +1,13 @@
 /**
  * ★ MERKEZİ VERİ DEPOSU VE REST / WEBSOCKET ENTEGRASYONU
  * Şartname Md. 35 & YOL_HARITASI §3, §5, §6
- * contracts/fixtures/*.json yapısına tam uyumlu.
+ * contracts/fixtures/*.json & contracts/events.md & openapi.yaml yapısına tam uyumlu.
+ *
+ * Gerçek Core + Gateway entegrasyonu (Damla'nın 4 geliştirme maddesi):
+ * 1. Canlı slot.occupied ve slot.freed olay dinleyicileri
+ * 2. Açılışta GET /lots/1/floors ile gerçek kat ve slot kapasitesi
+ * 3. GET /sessions?lot_id=1&limit=50 ile giriş-çıkış kayıtları
+ * 4. POST /entry ve POST /exit ile canlı REST istekleri (bağlantı yoksa akıllı simülasyon fallback)
  */
 
 (function (window) {
@@ -22,7 +28,7 @@
 
       this.floors = [];
       this.sessions = [];
-      this.tariffs = window.TariffEngine.DEFAULT_TARIFF_RULES;
+      this.tariffs = window.TariffEngine ? window.TariffEngine.DEFAULT_TARIFF_RULES : [];
       this.subscribers = new Set();
       this.cameraLogs = [];
 
@@ -30,17 +36,48 @@
       this.connectionStatus = 'simulated';
       this.connectedUrl = null;
       this.hasReceivedWsData = false;
+      this.isRealDataLoaded = false;
+      this.latestOccupancy = null;
       this.wsDataWatchdog = null;
       this.activeFloorLevel = 1;
       this.autoTrafficInterval = null;
       this.ws = null;
       this.wsRetryTimer = null;
 
-      // Başlangıç verilerini oluştur
+      // 1. Başlangıç yerel verilerini oluştur (çevrimdışı / bağımsız mod garantisi)
       this.initDefaultData();
 
-      // Arka planda gerçek/mock WS varsa bağlanmayı dene
+      // 2. Arka planda gerçek/mock WS varsa bağlanmayı dene
       this.tryWebSocket();
+
+      // 3. Gerçek kat planını API'den çekmeyi dene
+      this.fetchFloors();
+    }
+
+    /**
+     * REST API kök adresini belirler (Gateway: 8000, Mock: 8100)
+     */
+    getApiBaseUrl() {
+      if (this.connectedUrl) {
+        if (this.connectedUrl.includes(':8100')) return 'http://localhost:8100';
+        if (this.connectedUrl.includes(':8000')) return 'http://localhost:8000';
+      }
+      if (typeof window !== 'undefined' && window.location && window.location.port) {
+        if (window.location.port === '8000' || window.location.port === '8100') {
+          return window.location.origin;
+        }
+      }
+      return 'http://localhost:8000';
+    }
+
+    /**
+     * Gateway veya Mock servisine bağlı olup olmadığını kontrol eder
+     */
+    isConnected() {
+      return (
+        this.connectionStatus.startsWith('connected_') ||
+        this.connectionStatus.startsWith('waiting_')
+      );
     }
 
     /**
@@ -90,7 +127,7 @@
 
       this.floors = floors;
 
-      // Başlangıç için gerçekçi oturumlar ekle (yaklaşık %65-70 doluluk)
+      // Başlangıç için gerçekçi oturumlar ekle (yaklaşık %48-%82 arası rastgele doluluk)
       this.initInitialVehicles();
     }
 
@@ -174,6 +211,7 @@
      * Otopark durumunu rastgele yeni bir doluluk oranıyla sıfırlar/yeniler
      */
     resetSimulationState() {
+      this.isRealDataLoaded = false;
       this.initInitialVehicles();
       this.notifySubscribers({ event: 'state.reset' });
     }
@@ -188,7 +226,7 @@
     getOccupancy() {
       const byFloor = this.floors.map((floor) => {
         const occupied = floor.slots.filter((s) => s.status === 'occupied').length;
-        const total = floor.slots.length;
+        const total = floor.slots.length || floor.slot_count || 40;
         return {
           floor_id: floor.id,
           level: floor.level,
@@ -199,9 +237,9 @@
         };
       });
 
-      const total = byFloor.reduce((acc, f) => acc + f.total, 0);
+      const total = byFloor.reduce((acc, f) => acc + f.total, 0) || this.lot.total_slots || 120;
       const occupied = byFloor.reduce((acc, f) => acc + f.occupied, 0);
-      const free = total - occupied;
+      const free = Math.max(0, total - occupied);
       const occupancyRate = total > 0 ? (occupied / total) : 0;
 
       return {
@@ -220,7 +258,6 @@
      * Boş bir slot bulur. Katlar arasında ve slotlar içinde dengeli ve gerçekçi dağıtım yapar.
      */
     findAvailableSlot(preferredType = null, floorLevel = null) {
-      // 1. Belirli bir kat istenmişse sadece o kata bak
       if (floorLevel) {
         const floor = this.floors.find((f) => f.level === floorLevel);
         if (floor) {
@@ -236,7 +273,6 @@
         return null;
       }
 
-      // 2. Kat belirtilmemişse: Tüm katlardaki boş slotları topla
       const allFreeSlots = this.getAllSlots().filter((s) => s.status === 'free');
       if (allFreeSlots.length === 0) return null;
 
@@ -247,21 +283,132 @@
         }
       }
 
-      // 1., 2. ve 3. katlara rastgele ve gerçekçi dağıt
       return allFreeSlots[Math.floor(Math.random() * allFreeSlots.length)];
     }
 
     /**
-     * Plaka okundu, araç giriş yapıyor (ANPR Simülasyonu & REST POST /entry)
+     * 2. Madde: Açılışta gerçek kat planı ve slotları Gateway'den çeker (GET /lots/1/floors)
+     * openapi.yaml şemasına tam uyumlu
      */
-    vehicleEntry(plate, opts = {}) {
-      const hamPlaka = (plate || '').toUpperCase().replace(/\s+/g, '');
+    async fetchFloors() {
+      try {
+        const apiBase = this.getApiBaseUrl();
+        const res = await fetch(`${apiBase}/lots/1/floors`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          this.floors = data.map((f) => ({
+            id: f.id,
+            lot_id: f.lot_id || 1,
+            level: f.level,
+            slot_count: f.slot_count || (f.slots ? f.slots.length : 40),
+            slots: (f.slots || []).map((s) => ({
+              id: s.id,
+              floor_id: s.floor_id || f.id,
+              code: s.code,
+              type: s.type || 'standard',
+              status: s.status || (s.plate ? 'occupied' : 'free'),
+              plate: s.plate || null,
+              entry_at: s.entry_at || (s.status === 'occupied' || s.plate ? new Date().toISOString() : null),
+            })),
+          }));
 
+          const total = this.floors.reduce(
+            (acc, f) => acc + (f.slot_count || f.slots.length),
+            0
+          );
+          this.lot.total_slots = total;
+          this.isRealDataLoaded = true;
+          this.notifySubscribers({ event: 'floors.loaded', floors: this.floors });
+          return this.floors;
+        }
+      } catch (err) {
+        console.warn('API /lots/1/floors çağrısı yapılamadı, yerel kat planı devrede:', err.message);
+        return null;
+      }
+    }
+
+    /**
+     * 3. Madde: Giriş-çıkış oturum kayıtlarını Gateway'den çeker (GET /sessions)
+     * GET /sessions?plate=&lot_id=1&limit=50
+     */
+    async fetchSessions(params = {}) {
+      try {
+        const apiBase = this.getApiBaseUrl();
+        const url = new URL(`${apiBase}/sessions`);
+        url.searchParams.set('lot_id', '1');
+        url.searchParams.set('limit', String(params.limit || 50));
+        if (params.plate) {
+          url.searchParams.set('plate', params.plate);
+        }
+        const res = await fetch(url.toString());
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          this.sessions = data;
+          this.notifySubscribers({ event: 'sessions.loaded', sessions: data });
+          return data;
+        }
+      } catch (err) {
+        console.warn('API /sessions çağrısı yapılamadı, yerel oturum kayıtları devrede:', err.message);
+        return this.sessions;
+      }
+    }
+
+    /**
+     * 4. Madde: Araç girişi — Gateway'e gerçek REST POST /entry isteği gönderir
+     * Bağlı değilse veya ağ hatasında yerel simülatöre güvenle geçer.
+     */
+    async vehicleEntry(plate, opts = {}) {
+      const hamPlaka = (plate || '').toUpperCase().replace(/\s+/g, '');
       if (!window.ANPR.plakaGecerliMi(hamPlaka)) {
         throw new Error(`Geçersiz Türk plakası formatı: "${plate}". Örnek: 34ABC123`);
       }
 
-      // Plaka zaten içeride mi?
+      if (this.isConnected()) {
+        const apiBase = this.getApiBaseUrl();
+        let res;
+        try {
+          res = await fetch(`${apiBase}/entry`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plate: hamPlaka, lot_id: 1 }),
+          });
+        } catch (netErr) {
+          // Sunucuya hiç ulaşılamadı (ağ hatası veya CORS engeli):
+          // Simülasyona geç, rozeti güncelle ve kullanıcıya durumu göster
+          this.connectionStatus = 'simulated';
+          this.notifySubscribers({ event: 'connection.change', status: 'simulated' });
+          return this.simulateLocalEntry(hamPlaka, opts);
+        }
+
+        // Sunucu 201 Created döndüyse başarılı
+        if (res.status === 201) {
+          const session = await res.json();
+          // Damla'nın mimari kuralı: Ekrandaki doluluk ve slot güncellemesini elle yapmaya
+          // gerek yok. Core olayları gönderiyor, gateway WebSocket'ten iletiyor (slot.occupied).
+          return {
+            session: session,
+            slot: {
+              code: session.slot_code || '—',
+              plate: hamPlaka,
+            },
+            remote: true,
+          };
+        }
+
+        // Sunucu cevap verdi ama "hayır" dedi (409, 404, 500 vb.): hatayı göster, sahte başarı üretme
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || `Giriş işlemi başarısız (HTTP ${res.status})`);
+      }
+
+      return this.simulateLocalEntry(hamPlaka, opts);
+    }
+
+    /**
+     * Yerel Giriş Simülasyonu (file:// veya çevrimdışı fallback modu)
+     */
+    simulateLocalEntry(hamPlaka, opts = {}) {
       const existing = this.sessions.find((s) => s.plate === hamPlaka && s.status === 'open');
       if (existing) {
         throw new Error(`Bu plaka (${window.ANPR.formatPlaka(hamPlaka)}) zaten otoparkta! (Slot: ${existing.slot_code})`);
@@ -318,10 +465,76 @@
     }
 
     /**
-     * Araç çıkıyor, ücret hesaplanıyor (REST POST /exit)
+     * 4. Madde: Araç çıkışı — Gateway'e gerçek REST POST /exit isteği gönderir
      */
-    vehicleExit(plate) {
+    async vehicleExit(plate) {
       const hamPlaka = (plate || '').toUpperCase().replace(/\s+/g, '');
+      if (!hamPlaka) {
+        throw new Error('Lütfen bir plaka girin.');
+      }
+
+      if (this.isConnected()) {
+        const apiBase = this.getApiBaseUrl();
+        let res;
+        try {
+          res = await fetch(`${apiBase}/exit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plate: hamPlaka }),
+          });
+        } catch (netErr) {
+          // Sunucuya hiç ulaşılamadı (ağ hatası veya CORS engeli):
+          // Simülasyona geç, rozeti güncelle ve kullanıcıya durumu göster
+          this.connectionStatus = 'simulated';
+          this.notifySubscribers({ event: 'connection.change', status: 'simulated' });
+          return this.simulateLocalExit(hamPlaka);
+        }
+
+        // Sunucu 200 OK döndüyse ücret dökümünü formatla
+        if (res.status === 200) {
+          const breakdownData = await res.json();
+          return this.formatRemoteFeeBreakdown(breakdownData, hamPlaka);
+        }
+
+        // Sunucu cevap verdi ama "hayır" dedi (404, 409, 500 vb.): hatayı göster, sahte başarı üretme
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || `Çıkış işlemi başarısız (HTTP ${res.status})`);
+      }
+
+      return this.simulateLocalExit(hamPlaka);
+    }
+
+    /**
+     * openapi.yaml FeeBreakdown yanıtını arayüzün makbuz modal formatına dönüştürür
+     */
+    formatRemoteFeeBreakdown(feeData, plate) {
+      const lines = (feeData.lines || []).map((l, idx) => ({
+        label: `${idx + 1}. Kademe (${l.from_min} - ${l.to_min !== null ? l.to_min + ' dk' : 'Sınırsız'})`,
+        from_min: l.from_min,
+        to_min: l.to_min,
+        minutes: l.minutes,
+        price_per_min_cents: l.price_per_min_cents,
+        price_per_min_tl: (l.price_per_min_cents / 100).toFixed(2),
+        subtotal_cents: l.subtotal_cents,
+        subtotal_tl: (l.subtotal_cents / 100).toFixed(2),
+      }));
+
+      const totalCents = feeData.total_cents || 0;
+      return {
+        session_id: feeData.session_id,
+        plate: feeData.plate || plate,
+        duration_min: feeData.duration_min || 0,
+        total_cents: totalCents,
+        total_tl: (totalCents / 100).toFixed(2),
+        lines: lines,
+        slot_code: feeData.slot_code || '—',
+      };
+    }
+
+    /**
+     * Yerel Çıkış Simülasyonu (file:// veya çevrimdışı fallback modu)
+     */
+    simulateLocalExit(hamPlaka) {
       const session = this.sessions.find((s) => s.plate === hamPlaka && s.status === 'open');
 
       if (!session) {
@@ -384,21 +597,28 @@
     /**
      * Rastgele araç giriş simülasyonu
      */
-    simulateRandomEntry() {
+    async simulateRandomEntry() {
       const plaka = window.ANPR.rastgelePlaka();
-      return this.vehicleEntry(plaka);
+      return await this.vehicleEntry(plaka);
     }
 
     /**
      * Rastgele içerideki bir aracın çıkış simülasyonu
      */
-    simulateRandomExit() {
+    async simulateRandomExit() {
       const openSessions = this.sessions.filter((s) => s.status === 'open');
-      if (openSessions.length === 0) {
-        throw new Error('Şu an otoparkta çıkış yapabilecek araç yok!');
+      if (openSessions.length > 0) {
+        const randomSession = openSessions[Math.floor(Math.random() * openSessions.length)];
+        return await this.vehicleExit(randomSession.plate);
       }
-      const randomSession = openSessions[Math.floor(Math.random() * openSessions.length)];
-      return this.vehicleExit(randomSession.plate);
+
+      // Eğer açık oturum listesinde yoksa dolu slotlardan birinin plakasını al
+      const occupiedSlot = this.getAllSlots().find((s) => s.status === 'occupied' && s.plate);
+      if (occupiedSlot) {
+        return await this.vehicleExit(occupiedSlot.plate);
+      }
+
+      throw new Error('Şu an otoparkta çıkış yapabilecek araç yok!');
     }
 
     /**
@@ -411,16 +631,15 @@
       }
 
       if (active) {
-        this.autoTrafficInterval = setInterval(() => {
+        this.autoTrafficInterval = setInterval(async () => {
           try {
             const occ = this.getOccupancy();
-            // Doluluk durumuna göre giriş veya çıkış ihtimalini ayarla
             const shouldExit = occ.occupancy_rate > 0.85 ? Math.random() < 0.8 : Math.random() < 0.45;
 
             if (shouldExit && occ.occupied > 10) {
-              this.simulateRandomExit();
+              await this.simulateRandomExit();
             } else if (occ.free > 0) {
-              this.simulateRandomEntry();
+              await this.simulateRandomEntry();
             }
           } catch (e) {
             console.warn('Otomatik simülasyon adımı atlandı:', e.message);
@@ -484,6 +703,9 @@
             waiting: true,
           });
 
+          // Bağlantı açıldığı gibi gerçek kat planını ve oturumları hemen çek
+          this.fetchFloors();
+
           // 10 saniye içinde mesaj gelmezse durumu teyit et
           if (this.wsDataWatchdog) clearTimeout(this.wsDataWatchdog);
           this.wsDataWatchdog = setTimeout(() => {
@@ -503,25 +725,43 @@
         ws.onmessage = (ev) => {
           try {
             const msg = JSON.parse(ev.data);
-            if (msg.event === 'lot.occupancy' && msg.data) {
-              // İlk mesaj geldiğinde rozeti canlı akış moduna geçir
-              if (!this.hasReceivedWsData) {
-                this.hasReceivedWsData = true;
-                if (this.wsDataWatchdog) {
-                  clearTimeout(this.wsDataWatchdog);
-                  this.wsDataWatchdog = null;
-                }
-                this.connectionStatus = isGateway ? 'connected_gateway' : 'connected_mock';
-                this.notifySubscribers({
-                  event: 'connection.change',
-                  status: this.connectionStatus,
-                  url: targetUrl,
-                  mode: isGateway ? 'Gerçek Gateway (8000)' : 'Mock Gateway (8100)',
-                  streaming: true,
-                });
+            if (!msg || !msg.event) return;
+
+            // İlk mesaj geldiğinde rozeti canlı akış moduna geçir
+            if (!this.hasReceivedWsData) {
+              this.hasReceivedWsData = true;
+              if (this.wsDataWatchdog) {
+                clearTimeout(this.wsDataWatchdog);
+                this.wsDataWatchdog = null;
               }
+              this.connectionStatus = isGateway ? 'connected_gateway' : 'connected_mock';
+              this.notifySubscribers({
+                event: 'connection.change',
+                status: this.connectionStatus,
+                url: targetUrl,
+                mode: isGateway ? 'Gerçek Gateway (8000)' : 'Mock Gateway (8100)',
+                streaming: true,
+              });
+            }
+
+            // 1. Madde: slot.occupied, slot.freed ve lot.occupancy olayları
+            if (msg.event === 'slot.occupied' && msg.data) {
+              this.handleSlotOccupiedEvent(msg.data);
+            } else if (msg.event === 'slot.freed' && msg.data) {
+              this.handleSlotFreedEvent(msg.data);
+            } else if (msg.event === 'lot.occupancy' && msg.data) {
               this.applyExternalOccupancy(msg.data);
               this.notifySubscribers({ event: 'external.occupancy', data: msg.data });
+            } else if (msg.event === 'anpr.read_failed' && msg.data) {
+              this.addCameraLog({
+                type: 'error',
+                plate: '?? *** ??',
+                slotCode: '—',
+                timestamp: msg.data.at || new Date().toISOString(),
+                confidence: String(msg.data.confidence || 0.3),
+                message: `anpr.read_failed: ${msg.data.reason || 'Optik doğrulama başarısız'}.`,
+              });
+              this.notifySubscribers({ event: 'anpr.read_failed', data: msg.data });
             }
           } catch (e) {
             // sessizce geç
@@ -535,10 +775,8 @@
           }
           this.hasReceivedWsData = false;
           if (!opened) {
-            // Port kapalıysa bir sonraki adayı dene
             this.connectWebSocketCandidates(targets, index + 1);
           } else {
-            // Açık bağlantı koptuysa yerel simülasyona dön ve yeniden denemeyi planla
             this.connectionStatus = 'simulated';
             this.connectedUrl = null;
             this.notifySubscribers({ event: 'connection.change', status: 'simulated', url: null });
@@ -564,14 +802,82 @@
     }
 
     /**
+     * 1. Madde: WebSocket slot.occupied olayını işler
+     * data: { slot_id, lot_id, floor_id, slot_code, plate, session_id, at }
+     */
+    handleSlotOccupiedEvent(data) {
+      if (!data) return;
+      const slot = this.getAllSlots().find(
+        (s) => s.id === data.slot_id || s.code === data.slot_code
+      );
+
+      if (slot) {
+        slot.status = 'occupied';
+        slot.plate = data.plate;
+        slot.entry_at = data.at || new Date().toISOString();
+      }
+
+      this.addCameraLog({
+        type: 'entry',
+        plate: data.plate,
+        slotCode: data.slot_code || (slot ? slot.code : '—'),
+        timestamp: data.at || new Date().toISOString(),
+        confidence: '0.98',
+        message: 'Giriş kamerası plakayı tanıdı, bariyer açıldı.',
+      });
+
+      this.notifySubscribers({
+        event: 'slot.occupied',
+        data: data,
+        slot: slot,
+      });
+    }
+
+    /**
+     * 1. Madde: WebSocket slot.freed olayını işler
+     * data: { slot_id, lot_id, floor_id, slot_code, at }
+     */
+    handleSlotFreedEvent(data) {
+      if (!data) return;
+      const slot = this.getAllSlots().find(
+        (s) => s.id === data.slot_id || s.code === data.slot_code
+      );
+
+      if (slot) {
+        slot.status = 'free';
+        slot.plate = null;
+        slot.entry_at = null;
+      }
+
+      this.addCameraLog({
+        type: 'exit',
+        plate: '—',
+        slotCode: data.slot_code || (slot ? slot.code : '—'),
+        timestamp: data.at || new Date().toISOString(),
+        confidence: '0.99',
+        message: 'Araç ayrıldı, slot boşaldı.',
+      });
+
+      this.notifySubscribers({
+        event: 'slot.freed',
+        data: data,
+        slot: slot,
+      });
+    }
+
+    /**
      * Canlı Gateway/Mock sayaç verisini (lot.occupancy) yerel arayüze uygular.
-     * NOT: lot.occupancy bir sayaç olayıdır ve plaka bilgisi taşımaz. Aşağıdaki plaka üretimi,
-     * arayüzdeki kat slot görselleştirmesini ve sayaçları beslemek için yapılan yerel bir tahminlemedir;
-     * Gateway doğrudan bireysel vehicle.entry/vehicle.exit olayları yayınlamaya başladığında kaldırılacaktır.
      */
     applyExternalOccupancy(data) {
       if (!data) return;
-      if (Array.isArray(data.by_floor)) {
+      this.latestOccupancy = data;
+      if (typeof data.total === 'number') {
+        this.lot.total_slots = data.total;
+      }
+
+      // Eğer gerçek kat planı henüz API'den yüklenmediyse (salt simülasyon modundaysak)
+      // doluluk sayısını yakalamak için yerel tahminlemeyi sürdür:
+      if (!this.isRealDataLoaded && Array.isArray(data.by_floor)) {
         for (const extFloor of data.by_floor) {
           const localFloor = this.floors.find((f) => f.level === extFloor.level || f.id === extFloor.floor_id);
           if (localFloor && typeof extFloor.occupied === 'number') {
@@ -584,7 +890,6 @@
                 const randIdx = Math.floor(Math.random() * freeSlots.length);
                 const pickedSlot = freeSlots.splice(randIdx, 1)[0];
                 pickedSlot.status = 'occupied';
-                // Yerel tahminleme: Gateway'den münferit plaka gelene kadar slot doluluk illüzyonunu korur
                 pickedSlot.plate = window.ANPR.rastgelePlaka();
                 pickedSlot.entry_at = new Date().toISOString();
               }
@@ -622,4 +927,3 @@
 
   window.ParkingStore = new ParkingStore();
 })(window);
-
