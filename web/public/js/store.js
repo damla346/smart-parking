@@ -366,46 +366,40 @@
       }
 
       if (this.isConnected()) {
+        const apiBase = this.getApiBaseUrl();
+        let res;
         try {
-          const apiBase = this.getApiBaseUrl();
-          const res = await fetch(`${apiBase}/entry`, {
+          res = await fetch(`${apiBase}/entry`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ plate: hamPlaka, lot_id: 1 }),
           });
-
-          if (res.status === 201) {
-            const session = await res.json();
-            // Damla'nın mimari kuralı: Ekrandaki doluluk ve slot güncellemesini elle yapmaya
-            // gerek yok. Core olayları gönderiyor, gateway WebSocket'ten iletiyor (slot.occupied).
-            return {
-              session: session,
-              slot: {
-                code: session.slot_code || '—',
-                plate: hamPlaka,
-              },
-              remote: true,
-            };
-          }
-
-          const errData = await res.json().catch(() => ({}));
-          if (res.status === 409) {
-            throw new Error(errData.detail || 'Plaka zaten içeride veya otoparkta boş slot kalmadı!');
-          } else {
-            throw new Error(errData.detail || `Giriş işlemi başarısız (HTTP ${res.status})`);
-          }
-        } catch (err) {
-          if (
-            err.message &&
-            (err.message.includes('zaten içeride') ||
-              err.message.includes('boş slot') ||
-              err.message.includes('HTTP 409'))
-          ) {
-            throw err;
-          }
-          console.warn('REST POST /entry bağlantı hatası, yerel simülatöre geçiliyor:', err.message);
+        } catch (netErr) {
+          // Sunucuya hiç ulaşılamadı (ağ hatası veya CORS engeli):
+          // Simülasyona geç, rozeti güncelle ve kullanıcıya durumu göster
+          this.connectionStatus = 'simulated';
+          this.notifySubscribers({ event: 'connection.change', status: 'simulated' });
           return this.simulateLocalEntry(hamPlaka, opts);
         }
+
+        // Sunucu 201 Created döndüyse başarılı
+        if (res.status === 201) {
+          const session = await res.json();
+          // Damla'nın mimari kuralı: Ekrandaki doluluk ve slot güncellemesini elle yapmaya
+          // gerek yok. Core olayları gönderiyor, gateway WebSocket'ten iletiyor (slot.occupied).
+          return {
+            session: session,
+            slot: {
+              code: session.slot_code || '—',
+              plate: hamPlaka,
+            },
+            remote: true,
+          };
+        }
+
+        // Sunucu cevap verdi ama "hayır" dedi (409, 404, 500 vb.): hatayı göster, sahte başarı üretme
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || `Giriş işlemi başarısız (HTTP ${res.status})`);
       }
 
       return this.simulateLocalEntry(hamPlaka, opts);
@@ -480,37 +474,31 @@
       }
 
       if (this.isConnected()) {
+        const apiBase = this.getApiBaseUrl();
+        let res;
         try {
-          const apiBase = this.getApiBaseUrl();
-          const res = await fetch(`${apiBase}/exit`, {
+          res = await fetch(`${apiBase}/exit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ plate: hamPlaka }),
           });
-
-          if (res.status === 200) {
-            const breakdownData = await res.json();
-            return this.formatRemoteFeeBreakdown(breakdownData, hamPlaka);
-          }
-
-          const errData = await res.json().catch(() => ({}));
-          if (res.status === 404) {
-            throw new Error(errData.detail || 'Bu plakaya ait açık bir oturum bulunamadı.');
-          } else {
-            throw new Error(errData.detail || `Çıkış işlemi başarısız (HTTP ${res.status})`);
-          }
-        } catch (err) {
-          if (
-            err.message &&
-            (err.message.includes('açık bir oturum bulunamadı') ||
-              err.message.includes('Açık oturum bulunamadı') ||
-              err.message.includes('HTTP 404'))
-          ) {
-            throw err;
-          }
-          console.warn('REST POST /exit bağlantı hatası, yerel simülatöre geçiliyor:', err.message);
+        } catch (netErr) {
+          // Sunucuya hiç ulaşılamadı (ağ hatası veya CORS engeli):
+          // Simülasyona geç, rozeti güncelle ve kullanıcıya durumu göster
+          this.connectionStatus = 'simulated';
+          this.notifySubscribers({ event: 'connection.change', status: 'simulated' });
           return this.simulateLocalExit(hamPlaka);
         }
+
+        // Sunucu 200 OK döndüyse ücret dökümünü formatla
+        if (res.status === 200) {
+          const breakdownData = await res.json();
+          return this.formatRemoteFeeBreakdown(breakdownData, hamPlaka);
+        }
+
+        // Sunucu cevap verdi ama "hayır" dedi (404, 409, 500 vb.): hatayı göster, sahte başarı üretme
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || `Çıkış işlemi başarısız (HTTP ${res.status})`);
       }
 
       return this.simulateLocalExit(hamPlaka);
